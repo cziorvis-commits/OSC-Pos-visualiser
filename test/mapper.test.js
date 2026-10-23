@@ -23,6 +23,23 @@ test('merges per-axis messages for the same id', () => {
   assert.deepEqual(r.positions, [{ id: 'a', x: 5, y: 7, z: 0 }]);
 });
 
+test('merges id-less /pos/x, /pos/y, /pos/z and /pos/xy under a fixed id', () => {
+  const m = createMapper({
+    mappings: [
+      { address: '/pos/xyz', id: 'xyz', args: ['x', 'y', 'z'] },
+      { address: '/pos/xy', id: 'xyz', args: ['x', 'y'] },
+      { address: '/pos/x', id: 'xyz', args: ['x'] },
+      { address: '/pos/y', id: 'xyz', args: ['y'] },
+      { address: '/pos/z', id: 'xyz', args: ['z'] },
+    ],
+  });
+  m.map({ address: '/pos/x', args: [1] });
+  m.map({ address: '/pos/y', args: [2] });
+  assert.deepEqual(m.map({ address: '/pos/z', args: [3] }).positions, [{ id: 'xyz', x: 1, y: 2, z: 3 }]);
+  assert.deepEqual(m.map({ address: '/pos/xy', args: [4, 5] }).positions, [{ id: 'xyz', x: 4, y: 5, z: 3 }]);
+  assert.deepEqual(m.map({ address: '/pos/xyz', args: [6, 7, 8] }).positions, [{ id: 'xyz', x: 6, y: 7, z: 8 }]);
+});
+
 test('takes the id from an argument', () => {
   const m = createMapper({ mappings: [{ address: '/pos', args: ['id', 'x', 'y', 'z'] }] });
   assert.deepEqual(m.map({ address: '/pos', args: [12, 1, 2, 3] }).positions, [{ id: '12', x: 1, y: 2, z: 3 }]);

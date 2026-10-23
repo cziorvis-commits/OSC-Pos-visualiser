@@ -19,6 +19,11 @@
 
   "mappings": [
     { "address": "/kratos/targets/{id}/position", "args": ["x", "y", "z"] },
+    { "address": "/pos/xyz", "id": "xyz", "args": ["x", "y", "z"] },
+    { "address": "/pos/xy", "id": "xyz", "args": ["x", "y"] },
+    { "address": "/pos/x", "id": "xyz", "args": ["x"] },
+    { "address": "/pos/y", "id": "xyz", "args": ["y"] },
+    { "address": "/pos/z", "id": "xyz", "args": ["z"] },
     { "address": "/tracker/{id}/pos", "args": ["x", "y", "z"] },
     { "address": "/tracker/{id}/x", "args": ["x"] },
     { "address": "/tracker/{id}/y", "args": ["y"] },
