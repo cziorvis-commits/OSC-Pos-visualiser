@@ -3,10 +3,12 @@
   "httpPort": 8181,
 
   "stage": {
-    "width": 14,
-    "depth": 10,
-    "height": 8,
-    "origin": "downstage-centre"
+    "width": 3.66,
+    "depth": 3.66,
+    "height": 3,
+    "origin": "downstage-centre",
+    "position": [0, 0],
+    "rotation": 0
   },
 
   "transform": {

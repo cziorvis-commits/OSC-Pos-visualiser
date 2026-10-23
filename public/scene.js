@@ -46,10 +46,17 @@ export function createScene(container) {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
 
+  // stageGroup holds what stays at the tracking origin (grid, axes); floorGroup holds
+  // the floor, outline and stage labels, and is placed by stage.position / stage.rotation.
   const stageGroup = new THREE.Group();
   scene.add(stageGroup);
+  const floorGroup = new THREE.Group();
+  scene.add(floorGroup);
+  let floorMesh = null;
   let stageCentre = new THREE.Vector3();
   let stageSize = 10;
+  let placement = { position: [0, 0], rotation: 0 };
+  let onPlacementChange = () => {};
 
   const trackers = new Map();
   let trailsOn = true;
@@ -66,35 +73,32 @@ export function createScene(container) {
   resize();
 
   function setStage(stage = {}) {
-    const { width = 14, depth = 10, height = 8, origin = 'downstage-centre' } = stage;
+    const { width = 3.66, depth = 3.66, height = 3, origin = 'downstage-centre' } = stage;
     stageGroup.clear();
+    floorGroup.clear();
     const y0 = origin === 'centre' ? -depth / 2 : 0;
 
-    // Stage-coordinate extents, converted into three space.
+    // Floor-local extents (origin point at 0,0), converted into three space.
     const min = toThree({ x: -width / 2, y: y0, z: 0 });
     const max = toThree({ x: width / 2, y: y0 + depth, z: height });
-    const box = new THREE.Box3().setFromPoints([min, max]);
-    stageCentre = box.getCenter(new THREE.Vector3());
+    const localCentre = new THREE.Box3().setFromPoints([min, max]).getCenter(new THREE.Vector3());
     stageSize = Math.max(width, depth);
-
-    const gridSize = Math.ceil(stageSize + 6);
-    const grid = new THREE.GridHelper(gridSize, gridSize, 0x3a4250, 0x1e242d);
-    stageGroup.add(grid);
 
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(width, depth),
-      new THREE.MeshBasicMaterial({ color: 0x1b2330, transparent: true, opacity: 0.6, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: editing ? 0x24364d : 0x1b2330, transparent: true, opacity: 0.6, depthWrite: false }),
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(stageCentre.x, 0.001, stageCentre.z);
-    stageGroup.add(floor);
+    floor.position.set(localCentre.x, 0.001, localCentre.z);
+    floorGroup.add(floor);
+    floorMesh = floor;
 
     const outline = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(width, height, depth)),
       new THREE.LineBasicMaterial({ color: 0x4b5566, transparent: true, opacity: 0.5 }),
     );
-    outline.position.copy(stageCentre);
-    stageGroup.add(outline);
+    outline.position.copy(localCentre);
+    floorGroup.add(outline);
 
     // Downstage edge highlighted so orientation is obvious at a glance.
     const dsEdge = new THREE.Line(
@@ -104,22 +108,96 @@ export function createScene(container) {
       ]),
       new THREE.LineBasicMaterial({ color: 0xd29922 }),
     );
-    stageGroup.add(dsEdge);
+    floorGroup.add(dsEdge);
 
-    const axes = new THREE.AxesHelper(1);
-    stageGroup.add(axes);
     const labels = [
-      ['origin', { x: 0, y: 0, z: 0 }],
-      ['+X', { x: width / 2 + 0.6, y: y0 + depth / 2, z: 0 }],
-      ['−X', { x: -width / 2 - 0.6, y: y0 + depth / 2, z: 0 }],
-      ['Upstage +Y', { x: 0, y: y0 + depth + 0.6, z: 0 }],
-      ['Downstage / audience', { x: 0, y: y0 - 0.6, z: 0 }],
+      ['+X', { x: width / 2 + 0.4, y: y0 + depth / 2, z: 0 }],
+      ['−X', { x: -width / 2 - 0.4, y: y0 + depth / 2, z: 0 }],
+      ['Upstage +Y', { x: 0, y: y0 + depth + 0.4, z: 0 }],
+      ['Downstage / audience', { x: 0, y: y0 - 0.4, z: 0 }],
     ];
     for (const [text, p] of labels) {
       const l = makeTextLabel(text, 'label stage-label');
       toThree(p, l.position);
-      stageGroup.add(l);
+      floorGroup.add(l);
     }
+
+    // The tracking origin stays put while the floor moves.
+    stageGroup.add(new THREE.AxesHelper(1));
+    const originLabel = makeTextLabel('tracking origin', 'label stage-label');
+    stageGroup.add(originLabel);
+
+    floorGroup.userData.localCentre = localCentre;
+    setPlacement({ position: stage.position, rotation: stage.rotation }, false);
+  }
+
+  // Place the floor in tracking space: position = [x, y] of the floor's origin point
+  // (metres), rotation = degrees counter-clockwise seen from above.
+  function setPlacement({ position = [0, 0], rotation = 0 } = {}, notify = true) {
+    placement = { position: [Number(position[0]) || 0, Number(position[1]) || 0], rotation: Number(rotation) || 0 };
+    const [px, py] = placement.position;
+    floorGroup.position.copy(toThree({ x: px, y: py, z: 0 }));
+    floorGroup.rotation.y = (placement.rotation * Math.PI) / 180;
+    floorGroup.updateMatrixWorld();
+    stageCentre = floorGroup.localToWorld(floorGroup.userData.localCentre.clone());
+
+    // Grid on whole metres around the tracking origin, big enough to include the floor.
+    stageGroup.children.filter((c) => c.isGridHelper).forEach((g) => stageGroup.remove(g));
+    const reach = Math.max(Math.abs(stageCentre.x), Math.abs(stageCentre.z)) + stageSize;
+    const gridSize = 2 * Math.ceil(reach + 2);
+    stageGroup.add(new THREE.GridHelper(gridSize, gridSize, 0x3a4250, 0x1e242d));
+
+    if (notify) onPlacementChange(placement);
+  }
+
+  function getPlacement() {
+    return { position: [...placement.position], rotation: placement.rotation };
+  }
+
+  // ---- Move-floor mode: drag the floor across the ground plane ----
+  let editing = false;
+  const raycaster = new THREE.Raycaster();
+  const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  let drag = null; // { start: Vector3 on ground, position: [x, y] at drag start }
+
+  function groundPoint(ev) {
+    const r = renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    return { hitsFloor: raycaster.intersectObject(floorMesh).length > 0, point: raycaster.ray.intersectPlane(ground, new THREE.Vector3()) };
+  }
+
+  // Capture phase on the container so this runs before OrbitControls sees the press.
+  container.addEventListener('pointerdown', (ev) => {
+    if (!editing || ev.button !== 0) return;
+    const { hitsFloor, point } = groundPoint(ev);
+    if (!hitsFloor || !point) return;
+    controls.enabled = false;
+    drag = { start: point, position: [...placement.position] };
+    renderer.domElement.setPointerCapture(ev.pointerId);
+  }, true);
+
+  renderer.domElement.addEventListener('pointermove', (ev) => {
+    if (editing && !drag) renderer.domElement.style.cursor = groundPoint(ev).hitsFloor ? 'move' : '';
+    if (!drag) return;
+    const { point } = groundPoint(ev);
+    if (!point) return;
+    // three (x, z) -> stage (x, -y)
+    const dx = point.x - drag.start.x;
+    const dy = -(point.z - drag.start.z);
+    setPlacement({ position: [drag.position[0] + dx, drag.position[1] + dy], rotation: placement.rotation });
+  });
+
+  renderer.domElement.addEventListener('pointerup', () => {
+    if (!drag) return;
+    drag = null;
+    controls.enabled = true;
+  });
+
+  function setEditing(on) {
+    editing = on;
+    if (!on) renderer.domElement.style.cursor = '';
+    floorMesh.material.color.set(on ? 0x24364d : 0x1b2330);
   }
 
   function resetView() {
@@ -254,5 +332,8 @@ export function createScene(container) {
   setStage();
   resetView();
 
-  return { setStage, resetView, topView, updateTracker, render, setTrails, relabel };
+  return {
+    setStage, setPlacement, getPlacement, setEditing, resetView, topView, updateTracker, render, setTrails, relabel,
+    onPlacement(fn) { onPlacementChange = fn; },
+  };
 }

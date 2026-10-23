@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { createWebSocketServer } from './ws.js';
 import { decode } from './osc.js';
 import { createMapper } from './mapper.js';
+import { parsePlacement, updateStageText } from './stage-file.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = process.env.CONFIG || path.join(root, 'config.json');
@@ -46,8 +47,32 @@ const types = {
   '.css': 'text/css; charset=utf-8',
 };
 
+// POST /stage { position: [x, y], rotation } from "Move floor" -> config.json.
+// The file watcher then reloads it and broadcasts the new config to every page.
+function saveStage(req, res) {
+  let body = '';
+  req.on('data', (chunk) => {
+    body += chunk;
+    if (body.length > 10_000) req.destroy();
+  });
+  req.on('end', () => {
+    try {
+      const placement = parsePlacement(JSON.parse(body));
+      fs.writeFileSync(configPath, updateStageText(fs.readFileSync(configPath, 'utf8'), placement));
+      console.log(`Floor saved: position [${placement.position}], rotation ${placement.rotation}°`);
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(placement));
+    } catch (err) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' }).end(err.message);
+    }
+  });
+}
+
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  if (urlPath === '/stage' && req.method === 'POST') {
+    saveStage(req, res);
+    return;
+  }
   const file = path.join(publicDir, urlPath === '/' ? 'index.html' : urlPath);
   if (!file.startsWith(publicDir + path.sep)) {
     res.writeHead(403).end();

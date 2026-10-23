@@ -19,8 +19,28 @@
     <button id="resetView" title="Reset camera">Reset view</button>
     <button id="topView" title="Top-down plan view">Top</button>
     <button id="toggleTrails">Trails: on</button>
+    <button id="toggleFloor" title="Drag the floor to line it up with the real stage">Move floor</button>
     <button id="toggleMonitor">OSC monitor</button>
   </header>
+
+  <aside id="floorPanel" hidden>
+    <div class="floor-head">
+      <strong>Move floor</strong>
+      <span id="floorSize"></span>
+    </div>
+    <div class="floor-fields">
+      <label>X <input id="floorX" type="number" step="0.01"> m</label>
+      <label>Y <input id="floorY" type="number" step="0.01"> m</label>
+      <label>Rotate <input id="floorRot" type="number" step="0.5"> °</label>
+    </div>
+    <p class="hint">Drag the floor. Arrow keys nudge 1 cm (Shift: 10 cm). <kbd>[</kbd> <kbd>]</kbd> rotate 1° (Shift: 15°).</p>
+    <div class="floor-actions">
+      <span id="floorState"></span>
+      <span class="spacer"></span>
+      <button id="floorRevert">Revert</button>
+      <button id="floorSave" class="primary">Save</button>
+    </div>
+  </aside>
 
   <aside id="monitor" hidden>
     <div class="monitor-head">
