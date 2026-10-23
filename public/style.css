@@ -75,8 +75,7 @@ button:disabled { opacity: 0.45; cursor: default; border-color: var(--line); }
 }
 #floorPanel[hidden] { display: none; }
 .floor-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-#floorSize { color: var(--muted); font-size: 12px; }
-.floor-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.floor-fields { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
 .floor-fields label { color: var(--muted); font-size: 12px; }
 .floor-fields input {
   width: 64px;

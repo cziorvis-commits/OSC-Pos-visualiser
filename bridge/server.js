@@ -47,7 +47,7 @@ const types = {
   '.css': 'text/css; charset=utf-8',
 };
 
-// POST /stage { position: [x, y], rotation } from "Move floor" -> config.json.
+// POST /stage { width, depth, position: [x, y], rotation } from the Floor panel -> config.json.
 // The file watcher then reloads it and broadcasts the new config to every page.
 function saveStage(req, res) {
   let body = '';
@@ -59,7 +59,8 @@ function saveStage(req, res) {
     try {
       const placement = parsePlacement(JSON.parse(body));
       fs.writeFileSync(configPath, updateStageText(fs.readFileSync(configPath, 'utf8'), placement));
-      console.log(`Floor saved: position [${placement.position}], rotation ${placement.rotation}°`);
+      const size = placement.width ? `${placement.width} x ${placement.depth} m, ` : '';
+      console.log(`Floor saved: ${size}position [${placement.position}], rotation ${placement.rotation}°`);
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(placement));
     } catch (err) {
       res.writeHead(400, { 'Content-Type': 'text/plain' }).end(err.message);
@@ -98,16 +99,19 @@ function broadcast(obj) {
 }
 
 // Batch everything received within one frame (~16 ms) into a single WS message,
-// keeping only the latest position per tracker.
+// keeping only the latest position per tracker. `feeds` counts position messages
+// per mapping (uncapped, unlike `raw`) so the UI can show the feed type and rate.
 const MAX_RAW_PER_FLUSH = 200;
 let pendingRaw = [];
 let pendingPos = new Map();
+let pendingFeeds = {};
 
 setInterval(() => {
   if (pendingRaw.length === 0 && pendingPos.size === 0) return;
-  broadcast({ type: 'batch', raw: pendingRaw, pos: [...pendingPos.values()] });
+  broadcast({ type: 'batch', raw: pendingRaw, pos: [...pendingPos.values()], feeds: pendingFeeds });
   pendingRaw = [];
   pendingPos = new Map();
+  pendingFeeds = {};
 }, 16);
 
 // ---- OSC over UDP ----
@@ -123,7 +127,8 @@ udp.on('message', (buf, rinfo) => {
     return;
   }
   for (const msg of messages) {
-    const { matched, positions } = mapper.map(msg, t);
+    const { matched, positions, feeds } = mapper.map(msg, t);
+    for (const f of feeds) pendingFeeds[f] = (pendingFeeds[f] ?? 0) + 1;
     if (pendingRaw.length < MAX_RAW_PER_FLUSH) {
       const args = msg.args.map((a) => (Buffer.isBuffer(a) ? `<blob ${a.length}B>` : a));
       pendingRaw.push({ from: rinfo.address, address: msg.address, args, t, matched });

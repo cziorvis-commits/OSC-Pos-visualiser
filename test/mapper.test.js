@@ -8,6 +8,7 @@ test('maps /tracker/{id}/pos with xyz args', () => {
   const r = m.map({ address: '/tracker/3/pos', args: [1, 2, 3] });
   assert.equal(r.matched, true);
   assert.deepEqual(r.positions, [{ id: '3', x: 1, y: 2, z: 3 }]);
+  assert.deepEqual(r.feeds, ['/tracker/{id}/pos']);
   assert.equal(m.map({ address: '/other', args: [1] }).matched, false);
 });
 

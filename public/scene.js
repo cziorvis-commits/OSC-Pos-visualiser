@@ -56,6 +56,8 @@ export function createScene(container) {
   let stageCentre = new THREE.Vector3();
   let stageSize = 10;
   let placement = { position: [0, 0], rotation: 0 };
+  let currentStage = {};
+  let size = { width: 3.66, depth: 3.66 };
   let onPlacementChange = () => {};
 
   const trackers = new Map();
@@ -74,6 +76,8 @@ export function createScene(container) {
 
   function setStage(stage = {}) {
     const { width = 3.66, depth = 3.66, height = 3, origin = 'downstage-centre' } = stage;
+    currentStage = stage;
+    size = { width, depth };
     stageGroup.clear();
     floorGroup.clear();
     const y0 = origin === 'centre' ? -depth / 2 : 0;
@@ -114,7 +118,7 @@ export function createScene(container) {
       ['+X', { x: width / 2 + 0.4, y: y0 + depth / 2, z: 0 }],
       ['−X', { x: -width / 2 - 0.4, y: y0 + depth / 2, z: 0 }],
       ['Upstage +Y', { x: 0, y: y0 + depth + 0.4, z: 0 }],
-      ['Downstage / audience', { x: 0, y: y0 - 0.4, z: 0 }],
+      ['Downstage', { x: 0, y: y0 - 0.4, z: 0 }],
     ];
     for (const [text, p] of labels) {
       const l = makeTextLabel(text, 'label stage-label');
@@ -147,11 +151,21 @@ export function createScene(container) {
     const gridSize = 2 * Math.ceil(reach + 2);
     stageGroup.add(new THREE.GridHelper(gridSize, gridSize, 0x3a4250, 0x1e242d));
 
-    if (notify) onPlacementChange(placement);
+    if (notify) onPlacementChange(getFloor());
   }
 
   function getPlacement() {
     return { position: [...placement.position], rotation: placement.rotation };
+  }
+
+  // Floor size plus placement, as edited in the floor panel.
+  function getFloor() {
+    return { ...size, ...getPlacement() };
+  }
+
+  function setSize(width, depth) {
+    setStage({ ...currentStage, width, depth, ...getPlacement() });
+    onPlacementChange(getFloor());
   }
 
   // ---- Move-floor mode: drag the floor across the ground plane ----
@@ -218,11 +232,11 @@ export function createScene(container) {
     const group = new THREE.Group();
 
     const headMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4 });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 24, 16), headMat);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 24, 16), headMat);
     group.add(head);
 
     const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.3, 32), ringMat);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.11, 32), ringMat);
     ring.rotation.x = -Math.PI / 2;
     scene.add(ring);
 
@@ -233,7 +247,7 @@ export function createScene(container) {
     const labelEl = document.createElement('div');
     labelEl.className = 'label';
     const label = new CSS2DObject(labelEl);
-    label.position.set(0, 0.25, 0);
+    label.position.set(0, 0.1, 0);
     group.add(label);
 
     const trailPos = new Float32Array(MAX_TRAIL_POINTS * 3);
@@ -333,7 +347,7 @@ export function createScene(container) {
   resetView();
 
   return {
-    setStage, setPlacement, getPlacement, setEditing, resetView, topView, updateTracker, render, setTrails, relabel,
+    setStage, setPlacement, getPlacement, getFloor, setSize, setEditing, resetView, topView, updateTracker, render, setTrails, relabel,
     onPlacement(fn) { onPlacementChange = fn; },
   };
 }

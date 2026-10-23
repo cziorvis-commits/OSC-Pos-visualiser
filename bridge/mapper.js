@@ -45,10 +45,12 @@ export function createMapper(config) {
   const staleMs = config.staleMs ?? 1500;
   const raw = new Map(); // id -> { x: { v, t }, y: ..., z: ... } as last received
 
-  // Returns { matched, positions: [{ id, x, y, z }] } in stage coordinates
-  // (x = across stage, y = depth / upstage, z = height), metres.
+  // Returns { matched, positions: [{ id, x, y, z }], feeds: [mapping address, ...] } in
+  // stage coordinates (x = across stage, y = depth / upstage, z = height), metres.
+  // `feeds` lists the mappings that produced a position, for the summary bar.
   function map(msg, now = Date.now()) {
     const positions = [];
+    const feeds = [];
     let matched = false;
     for (const m of mappings) {
       const hit = m.re.exec(msg.address);
@@ -68,6 +70,7 @@ export function createMapper(config) {
       raw.set(id, axes);
       const p = {};
       for (const k of ['x', 'y', 'z']) p[k] = axes[k] && now - axes[k].t <= staleMs ? axes[k].v : 0;
+      feeds.push(m.address);
       positions.push({
         id,
         x: pick.x(p) * scale + ox,
@@ -75,7 +78,7 @@ export function createMapper(config) {
         z: pick.z(p) * scale + oz,
       });
     }
-    return { matched, positions };
+    return { matched, positions, feeds };
   }
 
   return { map };

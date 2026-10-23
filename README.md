@@ -45,7 +45,7 @@ Changes take effect live, with no restart needed.
 | Key | Meaning |
 | --- | --- |
 | `oscPort` / `httpPort` | UDP listen port / web UI port |
-| `stage` | `width`, `depth` and `height` in metres (default 3.66 × 3.66 LED floor). `origin` is the floor's reference point: `"downstage-centre"` or `"centre"`. `position` `[x,y]` is where that point sits in tracking coordinates and `rotation` is degrees anticlockwise seen from above; set them with **Move floor** (see below) |
+| `stage` | `width`, `depth` and `height` in metres (default 3.66 × 3.66 LED floor). `origin` is the floor's reference point: `"downstage-centre"` or `"centre"`. `position` `[x,y]` is where that point sits in tracking coordinates and `rotation` is degrees anticlockwise seen from above; set them all with the **Floor** panel (see below) |
 | `transform` | Maps incoming axes onto stage axes. `x`, `y` and `z` each take a value such as `"x"`, `"-y"` or `"z"`. Also takes `scale` (for example `0.001` for mm) and `offset` `[x,y,z]` |
 | `mappings` | Which OSC addresses carry positions (see below) |
 | `names` | Display names, for example `{ "1": "Lead", "2": "Dancer A" }` |
@@ -66,14 +66,14 @@ Stage axes: **x** runs across the stage, **y** is depth (upstage is positive) an
 - If the message carries no id at all, give the mapping a fixed one: `{ "address": "/pos/xyz", "id": "xyz", "args": ["x", "y", "z"] }`.
   Mappings that share an id (such as `/pos/x`, `/pos/y`, `/pos/z` and `/pos/xy`) merge into one tracker.
 
-### Move floor
+### Floor
 
-The floor moves; tracker positions are always drawn exactly as received. To line the floor up with the real one:
+The floor moves; tracker positions are always drawn exactly as received. To match the floor to the real one:
 
-1. Click **Move floor**.
+1. Click **Floor**. Type the real floor's **Width** and **Depth** if it isn't the default 3.66 × 3.66 m.
 2. Stand a tracked performer on a known floor corner or the centre mark, and move the floor until it sits under them.
    Drag the floor, nudge it with the arrow keys (1 cm, Shift for 10 cm), rotate with `[` and `]` (1°, Shift for 15°), or type X, Y and Rotate.
-3. Click **Save**. This writes `position` and `rotation` into `config.json`, and every open page updates. **Revert** goes back to the last save.
+3. Click **Save**. This writes the size, `position` and `rotation` into `config.json`, and every open page updates. **Revert** goes back to the last save.
 
 ## On-site checklist
 
@@ -82,7 +82,7 @@ The floor moves; tracker positions are always drawn exactly as received. To line
 3. Addresses shown in red under **Addresses** have no mapping. Add mappings for the position addresses to `config.json`.
 4. Walk a performer to known marks (centre, the downstage corners, upstage) and check the axes.
    Fix swaps or flips with `transform`. For example, if Naostage is Y-up, set `"y": "z", "z": "y"`.
-5. Set `stage` to the real floor size, line it up with **Move floor**, and add `names` for the performers.
+5. Set the real floor size and line it up in the **Floor** panel, and add `names` for the performers.
 
 ## Layout
 
@@ -90,6 +90,6 @@ The floor moves; tracker positions are always drawn exactly as received. To line
 - `bridge/ws.js`: minimal built-in WebSocket server
 - `bridge/osc.js`: OSC codec for messages and bundles, with no dependencies
 - `bridge/mapper.js`: maps addresses to tracker positions and applies the axis transform
-- `bridge/stage-file.js`: saves a **Move floor** placement into the `stage` block of `config.json`
+- `bridge/stage-file.js`: saves the **Floor** panel's size and placement into the `stage` block of `config.json`
 - `bridge/simulator.js`: sends test OSC
 - `public/`: the three.js UI (`scene.js`) and the OSC monitor (`monitor.js`); `vendor/` holds three.js r160

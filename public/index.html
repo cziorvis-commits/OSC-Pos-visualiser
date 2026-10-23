@@ -19,14 +19,17 @@
     <button id="resetView" title="Reset camera">Reset view</button>
     <button id="topView" title="Top-down plan view">Top</button>
     <button id="toggleTrails">Trails: on</button>
-    <button id="toggleFloor" title="Drag the floor to line it up with the real stage">Move floor</button>
+    <button id="toggleFloor" title="Set the floor size and line it up with the real stage">Floor</button>
     <button id="toggleMonitor">OSC monitor</button>
   </header>
 
   <aside id="floorPanel" hidden>
     <div class="floor-head">
-      <strong>Move floor</strong>
-      <span id="floorSize"></span>
+      <strong>Floor</strong>
+    </div>
+    <div class="floor-fields">
+      <label>Width <input id="floorW" type="number" step="0.01" min="0.1"> m</label>
+      <label>Depth <input id="floorD" type="number" step="0.01" min="0.1"> m</label>
     </div>
     <div class="floor-fields">
       <label>X <input id="floorX" type="number" step="0.01"> m</label>

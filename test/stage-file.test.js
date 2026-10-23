@@ -42,3 +42,13 @@ test('rounds placements to mm and 0.1 degrees, and rejects bad input', () => {
   assert.throws(() => parsePlacement({ position: [1, 2] }));
   assert.throws(() => parsePlacement(null));
 });
+
+test('accepts an optional floor size and rejects silly ones', () => {
+  assert.deepEqual(parsePlacement({ width: 4.8765, depth: 3.66, position: [0, 0], rotation: 0 }), {
+    width: 4.877, depth: 3.66, position: [0, 0], rotation: 0,
+  });
+  assert.throws(() => parsePlacement({ width: 0, depth: 3, position: [0, 0], rotation: 0 }), /width/);
+  assert.throws(() => parsePlacement({ width: 3, depth: 'big', position: [0, 0], rotation: 0 }), /depth/);
+  const next = updateStageText(CONFIG, parsePlacement({ width: 6, depth: 4, position: [0, 0], rotation: 0 }));
+  assert.deepEqual([JSON.parse(next).stage.width, JSON.parse(next).stage.depth], [6, 4]);
+});

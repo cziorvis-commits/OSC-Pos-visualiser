@@ -22,15 +22,17 @@ $('toggleMonitor').addEventListener('click', () => {
   monitorEl.hidden = !monitorEl.hidden;
 });
 
-// ---- Move floor: line the virtual floor up with the real one, then save to config.json ----
+// ---- Floor: set its size and line it up with the real one, then save to config.json ----
 const floorPanel = $('floorPanel');
 const round = (v, step) => Math.round(v / step) * step;
-const samePlacement = (a, b) =>
+const sameFloor = (a, b) =>
+  Math.abs(a.width - b.width) < 5e-4 && Math.abs(a.depth - b.depth) < 5e-4 &&
   Math.abs(a.position[0] - b.position[0]) < 5e-4 && Math.abs(a.position[1] - b.position[1]) < 5e-4 &&
   Math.abs(a.rotation - b.rotation) < 0.05;
 
-function savedPlacement() {
-  return { position: config.stage?.position ?? [0, 0], rotation: config.stage?.rotation ?? 0 };
+function savedFloor() {
+  const s = config.stage ?? {};
+  return { width: s.width ?? 3.66, depth: s.depth ?? 3.66, position: s.position ?? [0, 0], rotation: s.rotation ?? 0 };
 }
 
 function setFloorState(text, cls = '') {
@@ -38,22 +40,26 @@ function setFloorState(text, cls = '') {
   $('floorState').className = cls;
 }
 
-function showPlacement(p) {
-  for (const [id, v, digits] of [['floorX', p.position[0], 3], ['floorY', p.position[1], 3], ['floorRot', p.rotation, 1]]) {
+function showFloor(f) {
+  const fields = [
+    ['floorW', f.width, 2], ['floorD', f.depth, 2],
+    ['floorX', f.position[0], 3], ['floorY', f.position[1], 3], ['floorRot', f.rotation, 1],
+  ];
+  for (const [id, v, digits] of fields) {
     if (document.activeElement !== $(id)) $(id).value = v.toFixed(digits);
   }
-  const dirty = !samePlacement(p, savedPlacement());
+  const dirty = !sameFloor(f, savedFloor());
   setFloorState(dirty ? 'Unsaved changes' : 'Saved', dirty ? 'dirty' : '');
   $('floorSave').disabled = !dirty;
   $('floorRevert').disabled = !dirty;
 }
-view.onPlacement(showPlacement);
+view.onPlacement(showFloor);
 
 $('toggleFloor').addEventListener('click', (e) => {
   floorPanel.hidden = !floorPanel.hidden;
   view.setEditing(!floorPanel.hidden);
   e.target.classList.toggle('active', !floorPanel.hidden);
-  showPlacement(view.getPlacement());
+  showFloor(view.getFloor());
 });
 
 function nudge(dx, dy, drot) {
@@ -73,6 +79,14 @@ for (const id of ['floorX', 'floorY', 'floorRot']) {
   });
 }
 
+for (const id of ['floorW', 'floorD']) {
+  $(id).addEventListener('input', () => {
+    const w = parseFloat($('floorW').value);
+    const d = parseFloat($('floorD').value);
+    if (w >= 0.1 && d >= 0.1) view.setSize(w, d);
+  });
+}
+
 window.addEventListener('keydown', (e) => {
   if (floorPanel.hidden || e.target.tagName === 'INPUT') return;
   const step = e.shiftKey ? 0.1 : 0.01;
@@ -87,18 +101,24 @@ window.addEventListener('keydown', (e) => {
   nudge(...m);
 });
 
-$('floorRevert').addEventListener('click', () => view.setPlacement(savedPlacement()));
+$('floorRevert').addEventListener('click', () => {
+  view.setStage(config.stage);
+  showFloor(view.getFloor());
+});
 
 $('floorSave').addEventListener('click', async () => {
-  const p = view.getPlacement();
-  const body = { position: [round(p.position[0], 0.001), round(p.position[1], 0.001)], rotation: round(p.rotation, 0.1) };
+  const f = view.getFloor();
+  const body = {
+    width: round(f.width, 0.001), depth: round(f.depth, 0.001),
+    position: [round(f.position[0], 0.001), round(f.position[1], 0.001)], rotation: round(f.rotation, 0.1),
+  };
   setFloorState('Saving…');
   try {
     const res = await fetch('stage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!res.ok) throw new Error(await res.text());
     // The bridge rewrites config.json and broadcasts the new config, which marks this saved.
     config = { ...config, stage: { ...config.stage, ...body } };
-    showPlacement(view.getPlacement());
+    showFloor(view.getFloor());
   } catch (err) {
     setFloorState(`Not saved: ${err.message}`, 'error');
   }
@@ -124,29 +144,49 @@ function connect() {
       const shape = (s = {}) => JSON.stringify([s.width, s.depth, s.height, s.origin]);
       const shapeChanged = shape(msg.config.stage) !== shape(config.stage);
       const stageChanged = JSON.stringify(msg.config.stage) !== JSON.stringify(config.stage);
-      const draft = view.getPlacement();
-      const keepDraft = !floorPanel.hidden && !samePlacement(draft, savedPlacement());
+      const draft = view.getFloor();
+      const keepDraft = !floorPanel.hidden && !sameFloor(draft, savedFloor());
       config = msg.config;
       if (stageChanged) {
-        view.setStage(config.stage);
-        if (keepDraft) view.setPlacement(draft);
-        if (shapeChanged) view.resetView();
+        view.setStage(keepDraft ? { ...config.stage, ...draft } : config.stage);
+        if (shapeChanged && !keepDraft) view.resetView();
       }
-      if (!floorPanel.hidden) showPlacement(view.getPlacement());
-      $('floorSize').textContent = `${config.stage?.width ?? '?'} × ${config.stage?.depth ?? '?'} m`;
+      if (!floorPanel.hidden) showFloor(view.getFloor());
       view.relabel(config.names);
     } else if (msg.type === 'batch') {
       const now = performance.now();
       for (const p of msg.pos) view.updateTracker(p.id, p, config.names?.[p.id], now);
+      for (const [f, n] of Object.entries(msg.feeds ?? {})) {
+        const e = feeds.get(f) ?? { count: 0, hz: 0, last: 0 };
+        e.count += n;
+        e.last = now;
+        feeds.set(f, e);
+      }
       if (msg.raw.length) monitor.add(msg.raw);
     }
   };
 }
 connect();
 
+// Which mappings are feeding positions right now (e.g. "/pos/xy 25 Hz"), for the summary bar.
+const feeds = new Map(); // mapping address -> { count, hz, last }
+setInterval(() => {
+  for (const e of feeds.values()) {
+    e.hz = e.count;
+    e.count = 0;
+  }
+}, 1000);
+
+function feedText(now) {
+  const active = [...feeds].filter(([, e]) => now - e.last <= (config.staleMs ?? 1500));
+  if (!active.length) return 'Feed: none';
+  return `Feed: ${active.map(([f, e]) => (e.hz ? `${f} ${e.hz} Hz` : f)).join(', ')}`;
+}
+
 function frame() {
-  const { total, live } = view.render(performance.now(), config);
-  $('summary').textContent = `${live} live / ${total} trackers · OSC port ${config.oscPort ?? '?'}`;
+  const now = performance.now();
+  const { total, live } = view.render(now, config);
+  $('summary').textContent = `${live} live / ${total} trackers · ${feedText(now)} · OSC port ${config.oscPort ?? '?'}`;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
