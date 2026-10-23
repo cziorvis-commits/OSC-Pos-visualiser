@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OSC Position Visualiser</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="view"></div>
+
+  <header id="status">
+    <span id="conn" class="pill bad">disconnected</span>
+    <span id="summary"></span>
+    <span class="spacer"></span>
+    <button id="resetView" title="Reset camera">Reset view</button>
+    <button id="topView" title="Top-down plan view">Top</button>
+    <button id="toggleTrails">Trails: on</button>
+    <button id="toggleMonitor">OSC monitor</button>
+  </header>
+
+  <aside id="monitor" hidden>
+    <div class="monitor-head">
+      <strong>OSC monitor</strong>
+      <span class="spacer"></span>
+      <button id="pauseLog">Pause</button>
+      <button id="clearLog">Clear</button>
+    </div>
+    <section>
+      <h3>Senders</h3>
+      <ul id="senders"></ul>
+    </section>
+    <section>
+      <h3>Addresses <small>(red = no mapping in config.json)</small></h3>
+      <table id="addresses"><thead><tr><th>Address</th><th>Hz</th><th>Last args</th></tr></thead><tbody></tbody></table>
+    </section>
+    <section class="grow">
+      <h3>Log</h3>
+      <pre id="log"></pre>
+    </section>
+  </aside>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

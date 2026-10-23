@@ -1,0 +1,31 @@
+{
+  "oscPort": 9010,
+  "httpPort": 8080,
+
+  "stage": {
+    "width": 14,
+    "depth": 10,
+    "height": 8,
+    "origin": "downstage-centre"
+  },
+
+  "transform": {
+    "x": "x",
+    "y": "y",
+    "z": "z",
+    "scale": 1,
+    "offset": [0, 0, 0]
+  },
+
+  "mappings": [
+    { "address": "/tracker/{id}/pos", "args": ["x", "y", "z"] },
+    { "address": "/tracker/{id}/x", "args": ["x"] },
+    { "address": "/tracker/{id}/y", "args": ["y"] },
+    { "address": "/tracker/{id}/z", "args": ["z"] }
+  ],
+
+  "names": {},
+
+  "trailSeconds": 3,
+  "staleMs": 1500
+}

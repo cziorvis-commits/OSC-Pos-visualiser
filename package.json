@@ -1,0 +1,15 @@
+{
+  "name": "osc-pos-visualiser",
+  "version": "0.1.0",
+  "description": "Live 3D browser visualiser for OSC tracking positions (Naostage)",
+  "type": "module",
+  "scripts": {
+    "start": "node bridge/server.js",
+    "sim": "node bridge/simulator.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
