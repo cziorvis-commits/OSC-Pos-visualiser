@@ -9,22 +9,34 @@ Naostage ──UDP OSC──▶ bridge (Node, :9010) ──WebSocket──▶ br
 Browsers can't receive UDP, so a small Node bridge listens for OSC and relays it to the page.
 Everything runs locally, including three.js, so the show network needs no internet.
 
-## Run
+## Start it (no commands)
+
+1. Install **Node.js LTS** from <https://nodejs.org>. You only need to do this once; nothing else is needed.
+2. Double-click the launcher:
+   - **Mac:** `Start Visualiser.command`
+     The first time, macOS may block it. Right-click it, choose **Open**, then **Open** again.
+   - **Windows:** `Start Visualiser.bat`
+     If SmartScreen appears, click **More info**, then **Run anyway**.
+3. The visualiser opens in your browser. Keep the small terminal window open while you use it; close that window to stop.
+
+If you double-click the launcher while the visualiser is already running, it just opens the page again.
+Other devices on the network can open the `http://<laptop-ip>:8080` address shown in the window.
+
+### For developers
 
 ```bash
-npm install
-npm start            # bridge + UI; open the printed http://<laptop-ip>:8080 on any device
-npm run sim          # optional: sends 5 fake moving trackers to 127.0.0.1:9010
+npm start            # same as the launcher
+npm run sim          # sends 5 fake moving trackers to 127.0.0.1:9010
 npm test
 ```
 
-To change where the simulator sends, run `npm run sim -- <host> <port> <trackers> <rateHz>`.
+To change where the simulator sends, run `npm run sim -- <host> <port> <trackers> <rateHz>`. The app has no npm dependencies.
 
 ## Network setup (Naostage)
 
 Naostage is at **10.115.20.36**. In Naostage's OSC output, set the destination to the
 **IP of the laptop running the bridge**, on port **9010** (`oscPort` in `config.json`).
-`npm start` prints the laptop's IPs. Make sure the OS firewall allows inbound UDP on 9010.
+The launcher window prints the laptop's IPs. Make sure the OS firewall allows inbound UDP on 9010.
 
 ## config.json
 
@@ -54,7 +66,7 @@ Stage axes: **x** runs across the stage, **y** is depth (upstage is positive) an
 
 ## On-site checklist
 
-1. Run `npm start`, open the UI and click **OSC monitor**.
+1. Double-click the launcher and click **OSC monitor**.
 2. Point Naostage at the laptop on port 9010. **Senders** should show `10.115.20.36`.
 3. Addresses shown in red under **Addresses** have no mapping. Add mappings for the position addresses to `config.json`.
 4. Walk a performer to known marks (centre, the downstage corners, upstage) and check the axes.
@@ -63,7 +75,8 @@ Stage axes: **x** runs across the stage, **y** is depth (upstage is positive) an
 
 ## Layout
 
-- `bridge/server.js`: receives UDP, sends WebSocket messages and serves the UI
+- `bridge/server.js`: receives UDP, sends WebSocket messages and serves the UI (`--open` launches the browser)
+- `bridge/ws.js`: minimal built-in WebSocket server
 - `bridge/osc.js`: OSC codec for messages and bundles, with no dependencies
 - `bridge/mapper.js`: maps addresses to tracker positions and applies the axis transform
 - `bridge/simulator.js`: sends test OSC

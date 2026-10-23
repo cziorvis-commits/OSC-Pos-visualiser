@@ -4,12 +4,11 @@
   "description": "Live 3D browser visualiser for OSC tracking positions (Naostage)",
   "type": "module",
   "scripts": {
-    "start": "node bridge/server.js",
+    "start": "node bridge/server.js --open",
     "sim": "node bridge/simulator.js",
     "test": "node --test test/*.test.js"
   },
-  "engines": { "node": ">=20" },
-  "dependencies": {
-    "ws": "^8.18.0"
+  "engines": {
+    "node": ">=20"
   }
 }

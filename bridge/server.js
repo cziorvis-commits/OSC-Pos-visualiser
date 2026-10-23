@@ -1,11 +1,12 @@
 // OSC (UDP) -> WebSocket bridge, and static file server for the UI.
+import { exec } from 'node:child_process';
 import dgram from 'node:dgram';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { WebSocketServer } from 'ws';
+import { createWebSocketServer } from './ws.js';
 import { decode } from './osc.js';
 import { createMapper } from './mapper.js';
 
@@ -63,18 +64,13 @@ const server = http.createServer((req, res) => {
 });
 
 // ---- WebSocket ----
-const wss = new WebSocketServer({ server });
+const wss = createWebSocketServer(server, (client) => {
+  client.send(JSON.stringify({ type: 'config', config: clientConfig() }));
+});
 
 function broadcast(obj) {
-  const data = JSON.stringify(obj);
-  for (const client of wss.clients) {
-    if (client.readyState === 1) client.send(data);
-  }
+  wss.broadcast(JSON.stringify(obj));
 }
-
-wss.on('connection', (ws) => {
-  ws.send(JSON.stringify({ type: 'config', config: clientConfig() }));
-});
 
 // Batch everything received within one frame (~16 ms) into a single WS message,
 // keeping only the latest position per tracker.
@@ -90,7 +86,7 @@ setInterval(() => {
 }, 16);
 
 // ---- OSC over UDP ----
-const udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+const udp = dgram.createSocket('udp4');
 
 udp.on('message', (buf, rinfo) => {
   const t = Date.now();
@@ -112,19 +108,42 @@ udp.on('message', (buf, rinfo) => {
 });
 
 udp.on('error', (err) => {
-  console.error(`UDP error: ${err.message}`);
+  console.error(`Cannot listen for OSC on UDP ${config.oscPort}: ${err.message}`);
   process.exit(1);
 });
 
-udp.bind(config.oscPort, '0.0.0.0', () => {
-  console.log(`Listening for OSC on UDP 0.0.0.0:${config.oscPort}`);
+// `--open` (used by the double-click launchers) opens the UI in the default browser.
+const uiUrl = `http://localhost:${config.httpPort}`;
+function openBrowser() {
+  const cmd =
+    process.platform === 'win32' ? `start "" "${uiUrl}"`
+    : process.platform === 'darwin' ? `open "${uiUrl}"`
+    : `xdg-open "${uiUrl}"`;
+  exec(cmd, (err) => err && console.log(`Open ${uiUrl} in your browser`));
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    // Most likely the visualiser is already running: just show it.
+    console.log(`Port ${config.httpPort} is already in use - the visualiser is probably already running.`);
+    if (process.argv.includes('--open')) openBrowser();
+    setTimeout(() => process.exit(0), 1500);
+    return;
+  }
+  console.error(`Web server error: ${err.message}`);
+  process.exit(1);
 });
 
 server.listen(config.httpPort, () => {
+  udp.bind(config.oscPort, '0.0.0.0', () => {
+    console.log(`Listening for OSC on UDP 0.0.0.0:${config.oscPort}`);
+  });
   const ips = Object.values(os.networkInterfaces())
     .flat()
     .filter((i) => i && i.family === 'IPv4' && !i.internal)
     .map((i) => i.address);
-  console.log(`UI: http://localhost:${config.httpPort}`);
+  console.log(`UI: ${uiUrl}`);
   for (const ip of ips) console.log(`    http://${ip}:${config.httpPort}  (point Naostage OSC output at ${ip}:${config.oscPort})`);
+  console.log('Keep this window open while using the visualiser. Close it to stop.');
+  if (process.argv.includes('--open')) openBrowser();
 });
