@@ -123,7 +123,7 @@ udp.on('message', (buf, rinfo) => {
     return;
   }
   for (const msg of messages) {
-    const { matched, positions } = mapper.map(msg);
+    const { matched, positions } = mapper.map(msg, t);
     if (pendingRaw.length < MAX_RAW_PER_FLUSH) {
       const args = msg.args.map((a) => (Buffer.isBuffer(a) ? `<blob ${a.length}B>` : a));
       pendingRaw.push({ from: rinfo.address, address: msg.address, args, t, matched });

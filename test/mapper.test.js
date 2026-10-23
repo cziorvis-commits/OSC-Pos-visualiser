@@ -40,6 +40,19 @@ test('merges id-less /pos/x, /pos/y, /pos/z and /pos/xy under a fixed id', () =>
   assert.deepEqual(m.map({ address: '/pos/xyz', args: [6, 7, 8] }).positions, [{ id: 'xyz', x: 6, y: 7, z: 8 }]);
 });
 
+test('drops an axis back to 0 once it has not been updated for staleMs', () => {
+  const m = createMapper({
+    staleMs: 1500,
+    mappings: [
+      { address: '/pos/xyz', id: 'xyz', args: ['x', 'y', 'z'] },
+      { address: '/pos/xy', id: 'xyz', args: ['x', 'y'] },
+    ],
+  });
+  m.map({ address: '/pos/xyz', args: [1, 2, 3] }, 0);
+  assert.deepEqual(m.map({ address: '/pos/xy', args: [4, 5] }, 1500).positions, [{ id: 'xyz', x: 4, y: 5, z: 3 }]);
+  assert.deepEqual(m.map({ address: '/pos/xy', args: [6, 7] }, 1501).positions, [{ id: 'xyz', x: 6, y: 7, z: 0 }]);
+});
+
 test('takes the id from an argument', () => {
   const m = createMapper({ mappings: [{ address: '/pos', args: ['id', 'x', 'y', 'z'] }] });
   assert.deepEqual(m.map({ address: '/pos', args: [12, 1, 2, 3] }).positions, [{ id: '12', x: 1, y: 2, z: 3 }]);

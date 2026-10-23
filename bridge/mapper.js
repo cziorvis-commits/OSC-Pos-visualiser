@@ -4,7 +4,9 @@
 // A mapping is { "address": "/tracker/{id}/pos", "args": ["x", "y", "z"] }.
 //   - `{id}` captures one address segment as the tracker id, `*` matches any one segment.
 //   - `args` names each OSC argument by position: "id", "x", "y", "z", or null to skip.
-// Partial updates (e.g. /1/x then /1/y) are merged per tracker.
+// Partial updates (e.g. /1/x then /1/y) are merged per tracker. An axis that hasn't
+// been updated for `staleMs` drops back to 0, so switching a sender from xyz to xy
+// doesn't leave z frozen at its last value.
 
 function compile(pattern) {
   const re = pattern
@@ -40,11 +42,12 @@ export function createMapper(config) {
   };
   const scale = t.scale ?? 1;
   const [ox, oy, oz] = t.offset ?? [0, 0, 0];
-  const raw = new Map(); // id -> last raw {x, y, z} as received
+  const staleMs = config.staleMs ?? 1500;
+  const raw = new Map(); // id -> { x: { v, t }, y: ..., z: ... } as last received
 
   // Returns { matched, positions: [{ id, x, y, z }] } in stage coordinates
   // (x = across stage, y = depth / upstage, z = height), metres.
-  function map(msg) {
+  function map(msg, now = Date.now()) {
     const positions = [];
     let matched = false;
     for (const m of mappings) {
@@ -60,8 +63,11 @@ export function createMapper(config) {
       });
       if (id == null || Object.keys(update).length === 0) continue;
       id = String(id);
-      const p = { x: 0, y: 0, z: 0, ...raw.get(id), ...update };
-      raw.set(id, p);
+      const axes = raw.get(id) ?? {};
+      for (const [k, v] of Object.entries(update)) axes[k] = { v, t: now };
+      raw.set(id, axes);
+      const p = {};
+      for (const k of ['x', 'y', 'z']) p[k] = axes[k] && now - axes[k].t <= staleMs ? axes[k].v : 0;
       positions.push({
         id,
         x: pick.x(p) * scale + ox,
