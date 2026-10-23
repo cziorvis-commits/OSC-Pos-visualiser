@@ -3,7 +3,7 @@
 import dgram from 'node:dgram';
 import { encodeBundle, encodeMessage } from './osc.js';
 
-const [host = '127.0.0.1', port = '9010', count = '5', rate = '50'] = process.argv.slice(2);
+const [host = '127.0.0.1', port = '9111', count = '5', rate = '50'] = process.argv.slice(2);
 const n = Number(count);
 const sock = dgram.createSocket('udp4');
 const start = Date.now();

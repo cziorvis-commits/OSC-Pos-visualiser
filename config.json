@@ -1,6 +1,6 @@
 {
-  "oscPort": 9010,
-  "httpPort": 8080,
+  "oscPort": 9111,
+  "httpPort": 8181,
 
   "stage": {
     "width": 14,

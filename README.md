@@ -3,7 +3,7 @@
 Live 3D view of tracking positions received as OSC. It's built for Naostage but works with any OSC sender.
 
 ```
-Naostage ──UDP OSC──▶ bridge (Node, :9010) ──WebSocket──▶ browser (three.js, :8080)
+Naostage ──UDP OSC──▶ bridge (Node, :9111) ──WebSocket──▶ browser (three.js, :8181)
 ```
 
 Browsers can't receive UDP, so a small Node bridge listens for OSC and relays it to the page.
@@ -20,13 +20,13 @@ Everything runs locally, including three.js, so the show network needs no intern
 3. The visualiser opens in your browser. Keep the small terminal window open while you use it; close that window to stop.
 
 If you double-click the launcher while the visualiser is already running, it just opens the page again.
-Other devices on the network can open the `http://<laptop-ip>:8080` address shown in the window.
+Other devices on the network can open the `http://<laptop-ip>:8181` address shown in the window.
 
 ### For developers
 
 ```bash
 npm start            # same as the launcher
-npm run sim          # sends 5 fake moving trackers to 127.0.0.1:9010
+npm run sim          # sends 5 fake moving trackers to 127.0.0.1:9111
 npm test
 ```
 
@@ -35,8 +35,8 @@ To change where the simulator sends, run `npm run sim -- <host> <port> <trackers
 ## Network setup (Naostage)
 
 Naostage is at **10.115.20.36**. In Naostage's OSC output, set the destination to the
-**IP of the laptop running the bridge**, on port **9010** (`oscPort` in `config.json`).
-The launcher window prints the laptop's IPs. Make sure the OS firewall allows inbound UDP on 9010.
+**IP of the laptop running the bridge**, on port **9111** (`oscPort` in `config.json`).
+The launcher window prints the laptop's IPs. Make sure the OS firewall allows inbound UDP on 9111.
 
 ## config.json
 
@@ -67,7 +67,7 @@ Stage axes: **x** runs across the stage, **y** is depth (upstage is positive) an
 ## On-site checklist
 
 1. Double-click the launcher and click **OSC monitor**.
-2. Point Naostage at the laptop on port 9010. **Senders** should show `10.115.20.36`.
+2. Point Naostage at the laptop on port 9111. **Senders** should show `10.115.20.36`.
 3. Addresses shown in red under **Addresses** have no mapping. Add mappings for the position addresses to `config.json`.
 4. Walk a performer to known marks (centre, the downstage corners, upstage) and check the axes.
    Fix swaps or flips with `transform`. For example, if Naostage is Y-up, set `"y": "z", "z": "y"`.
