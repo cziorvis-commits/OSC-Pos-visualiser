@@ -1,5 +1,6 @@
 import { createScene } from './scene.js';
 import { createMonitor } from './monitor.js';
+import { createTable } from './table.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,6 +17,13 @@ $('toggleTrails').addEventListener('click', (e) => {
   trailsOn = !trailsOn;
   view.setTrails(trailsOn);
   e.target.textContent = `Trails: ${trailsOn ? 'on' : 'off'}`;
+});
+
+const tableEl = $('table');
+const table = createTable(tableEl, (id) => view.colorOf(id));
+$('toggleTable').addEventListener('click', (e) => {
+  tableEl.hidden = !tableEl.hidden;
+  e.target.classList.toggle('active', !tableEl.hidden);
 });
 
 $('toggleMonitor').addEventListener('click', () => {
@@ -124,6 +132,63 @@ $('floorSave').addEventListener('click', async () => {
   }
 });
 
+// ---- Inputs: switch OSC / PSN on and off, and show what each is receiving ----
+let inputStatus = {};
+const inputError = {}; // kind -> why the last switch failed, until the next one
+const inputLabels = {
+  osc: () => ({ name: 'OSC', where: `:${config.oscPort ?? '?'}` }),
+  psn: () => ({ name: 'PSN', where: config.psn ? `${config.psn.group}:${config.psn.port}` : '' }),
+};
+
+function showInputs() {
+  for (const kind of ['osc', 'psn']) {
+    const el = $(`input-${kind}`);
+    const s = inputStatus[kind];
+    const on = config.inputs?.[kind] ?? true;
+    const { name, where } = inputLabels[kind]();
+    const receiving = s && s.ago != null && s.ago < 2000;
+    let state, detail, tip;
+    if (s?.error) {
+      [state, detail, tip] = ['error', 'error', `Cannot listen on ${where}: ${s.error}`];
+    } else if (!on) {
+      state = 'off';
+      detail = receiving ? `off · ${s.hz} Hz available` : 'off';
+      tip = receiving ? `${name} is arriving from ${s.from} but is switched off. Click to use it.` : `${name} is switched off. Click to use it.`;
+    } else if (receiving) {
+      [state, detail, tip] = ['live', `${s.hz} Hz`, `Receiving ${name} on ${where} from ${s.from}. Click to switch off.`];
+    } else {
+      state = 'waiting';
+      detail = s?.listening === false ? 'starting' : 'no data';
+      tip = `Listening for ${name} on ${where}, nothing received${s?.from ? ` (last from ${s.from})` : ''}. Click to switch off.`;
+    }
+    const other = config.inputs?.[kind === 'osc' ? 'psn' : 'osc'] ?? true;
+    if (on && !other) tip += ' (Switch the other input on first: at least one stays on.)';
+    if (inputError[kind]) tip = inputError[kind];
+    el.className = `input ${state}`;
+    el.setAttribute('aria-pressed', String(on));
+    el.disabled = on && !other;
+    el.title = tip;
+    el.innerHTML = `<b>${name}</b> <small>${where} · ${detail}</small>`;
+  }
+}
+
+for (const kind of ['osc', 'psn']) {
+  $(`input-${kind}`).addEventListener('click', async () => {
+    const next = { osc: config.inputs?.osc ?? true, psn: config.inputs?.psn ?? true };
+    next[kind] = !next[kind];
+    delete inputError[kind];
+    try {
+      const res = await fetch('inputs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
+      if (!res.ok) throw new Error(await res.text());
+      config = { ...config, inputs: next }; // the bridge also broadcasts it to every page
+      showInputs();
+    } catch (err) {
+      inputError[kind] = `Not switched: ${err.message}`;
+      showInputs();
+    }
+  });
+}
+
 function setConn(ok, text) {
   const el = $('conn');
   el.className = `pill ${ok ? 'good' : 'bad'}`;
@@ -135,6 +200,8 @@ function connect() {
   ws.onopen = () => setConn(true, 'bridge connected');
   ws.onclose = () => {
     setConn(false, 'bridge disconnected – retrying');
+    inputStatus = {};
+    showInputs();
     setTimeout(connect, 1000);
   };
   ws.onmessage = (ev) => {
@@ -153,9 +220,14 @@ function connect() {
       }
       if (!floorPanel.hidden) showFloor(view.getFloor());
       view.relabel(config.names);
+      showInputs();
+    } else if (msg.type === 'inputs') {
+      inputStatus = msg.status;
+      showInputs();
     } else if (msg.type === 'batch') {
       const now = performance.now();
       for (const p of msg.pos) view.updateTracker(p.id, p, config.names?.[p.id], now);
+      table.add(msg.pos, now);
       for (const [f, n] of Object.entries(msg.feeds ?? {})) {
         const e = feeds.get(f) ?? { count: 0, hz: 0, last: 0 };
         e.count += n;
@@ -186,7 +258,8 @@ function feedText(now) {
 function frame() {
   const now = performance.now();
   const { total, live } = view.render(now, config);
-  $('summary').textContent = `${live} live / ${total} trackers · ${feedText(now)} · OSC port ${config.oscPort ?? '?'}`;
+  table.render(now, config);
+  $('summary').textContent = `${live} live / ${total} trackers · ${feedText(now)}`;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

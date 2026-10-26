@@ -336,6 +336,12 @@ export function createScene(container) {
     trailsOn = on;
   }
 
+  // The tracker's marker colour as CSS, so the Table view can match it.
+  function colorOf(id) {
+    const t = trackers.get(id);
+    return t ? `#${(t.stale ? STALE_COLOR : t.color).getHexString()}` : 'transparent';
+  }
+
   function relabel(names = {}) {
     for (const t of trackers.values()) {
       const p = t.stage;
@@ -347,7 +353,7 @@ export function createScene(container) {
   resetView();
 
   return {
-    setStage, setPlacement, getPlacement, getFloor, setSize, setEditing, resetView, topView, updateTracker, render, setTrails, relabel,
+    setStage, setPlacement, getPlacement, getFloor, setSize, setEditing, resetView, topView, updateTracker, render, setTrails, relabel, colorOf,
     onPlacement(fn) { onPlacementChange = fn; },
   };
 }

@@ -6,6 +6,7 @@
   --muted: #8a94a6;
   --good: #3fb950;
   --bad: #f85149;
+  --warn: #e3b341;
   --accent: #58a6ff;
   font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: dark;
@@ -47,6 +48,18 @@ html, body {
 .pill.good { background: color-mix(in srgb, var(--good) 25%, transparent); color: var(--good); }
 .pill.bad { background: color-mix(in srgb, var(--bad) 25%, transparent); color: var(--bad); }
 
+/* Input toggles: one per protocol, showing whether it's on and what it's receiving. */
+.inputs { display: inline-flex; gap: 4px; }
+button.input { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; }
+button.input::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+button.input b { font-weight: 700; }
+button.input small { color: var(--muted); font-size: 11px; }
+button.input.live { color: var(--good); border-color: color-mix(in srgb, var(--good) 60%, transparent); }
+button.input.waiting { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, transparent); }
+button.input.error { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 60%, transparent); }
+button.input.off { color: var(--muted); border-style: dashed; }
+button.input.off::before { background: transparent; border: 1px solid currentColor; }
+
 #summary { color: var(--muted); }
 
 button {
@@ -62,6 +75,7 @@ button:hover { border-color: var(--accent); }
 
 button.active, button.primary { border-color: var(--accent); color: var(--accent); }
 button:disabled { opacity: 0.45; cursor: default; border-color: var(--line); }
+button.input:disabled { opacity: 1; cursor: not-allowed; }
 
 #floorPanel {
   position: fixed;
@@ -90,8 +104,56 @@ button:disabled { opacity: 0.45; cursor: default; border-color: var(--line); }
 #floorPanel kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
 .floor-actions { display: flex; gap: 8px; align-items: center; }
 #floorState { color: var(--muted); font-size: 12px; }
-#floorState.dirty { color: #e3b341; }
+#floorState.dirty { color: var(--warn); }
 #floorState.error { color: var(--bad); }
+
+#table {
+  position: fixed;
+  left: 12px; bottom: 12px;
+  width: min(880px, calc(100vw - 24px));
+  max-height: 45vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  z-index: 2;
+}
+#table[hidden] { display: none; }
+.table-head { display: flex; gap: 8px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.table-head small { color: var(--muted); }
+.table-scroll { overflow: auto; min-height: 0; }
+/* Fixed layout: columns keep their width as values change, instead of jumping
+   whenever a minus sign, a longer name or a longer age appears.
+   Every column is sized to its content except Address, which takes what's left. */
+#liveTable { width: 100%; min-width: 820px; table-layout: fixed; border-collapse: collapse; font: 12px ui-monospace, Menlo, monospace; }
+#liveTable .c-swatch { width: 24px; }
+#liveTable .c-name { width: 140px; }
+#liveTable .c-src { width: 56px; }
+#liveTable .c-from { width: 108px; }
+#liveTable .c-xyz { width: 82px; } /* fits -999.9999 */
+#liveTable .c-hz { width: 44px; }
+#liveTable .c-age { width: 64px; }
+#liveTable th {
+  position: sticky; top: 0;
+  background: #161b22;
+  text-align: left; color: var(--muted); font-weight: 500;
+  padding: 4px 8px;
+}
+#liveTable td { padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--line); }
+#liveTable .num { text-align: right; font-variant-numeric: tabular-nums; }
+#liveTable td.num { text-overflow: clip; } /* never show a value cut short as if it were exact */
+#liveTable td.swatch { padding-right: 0; }
+#liveTable th.num { text-align: right; }
+#liveTable td.swatch span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+#liveTable td.name small { color: var(--muted); margin-left: 6px; }
+#liveTable tr.stale td { color: var(--muted); }
+#liveTable tr.stale td.age { color: var(--warn); }
+#liveTable tr.empty td { color: var(--muted); text-align: center; padding: 10px; }
+#liveTable .src { font-weight: 700; font-size: 11px; }
+#liveTable .src.osc { color: var(--accent); }
+#liveTable .src.psn { color: #d2a8ff; }
+#freezeTable.active { color: var(--warn); border-color: var(--warn); }
 
 #monitor {
   position: fixed;

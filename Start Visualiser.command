@@ -2,6 +2,17 @@
 # macOS: double-click to start the OSC Position Visualiser.
 cd "$(dirname "$0")" || exit 1
 
+# If the menu bar app is installed, use it instead: it runs the bridge without a terminal.
+for app in "/Applications/OSC Visualiser.app" "$HOME/Applications/OSC Visualiser.app" "dist/OSC Visualiser.app"; do
+  if [ -d "$app" ]; then
+    open "$app"
+    # Close this Terminal window once the script has exited.
+    (sleep 1; osascript -e 'tell application "Terminal" to close (every window whose name contains "Start Visualiser.command")') >/dev/null 2>&1 &
+    disown
+    exit 0
+  fi
+done
+
 if ! command -v node >/dev/null 2>&1; then
   for p in /opt/homebrew/bin /usr/local/bin; do [ -x "$p/node" ] && PATH="$p:$PATH"; done
 fi
