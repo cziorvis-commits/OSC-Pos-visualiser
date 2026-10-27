@@ -118,6 +118,7 @@ Stage axes: **x** runs across the stage, **y** is depth (upstage is positive) an
 - If the id is in an argument rather than the address, use `{ "address": "/pos", "args": ["id", "x", "y", "z"] }`.
 - If the message carries no id at all, give the mapping a fixed one: `{ "address": "/pos/xyz", "id": "xyz", "args": ["x", "y", "z"] }`.
   Mappings that share an id (such as `/pos/x`, `/pos/y`, `/pos/z` and `/pos/xy`) merge into one tracker.
+- SP Grid sends `/SP/posx`, `/SP/posy` and `/SP/posz` and is Y-up, so its y is mapped to stage z and its z to stage y, merged under the id `sp` (shown as **SP Grid**). Its `/SP/rot*` messages are ignored.
 
 ### Floor
 

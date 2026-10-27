@@ -41,6 +41,20 @@ test('merges id-less /pos/x, /pos/y, /pos/z and /pos/xy under a fixed id', () =>
   assert.deepEqual(m.map({ address: '/pos/xyz', args: [6, 7, 8] }).positions, [{ id: 'xyz', x: 6, y: 7, z: 8 }]);
 });
 
+test('merges SP Grid per-axis /SP/posx, /SP/posy, /SP/posz as Y-up', () => {
+  const m = createMapper({
+    mappings: [
+      { address: '/SP/posx', id: 'sp', args: ['x'] },
+      { address: '/SP/posy', id: 'sp', args: ['z'] },
+      { address: '/SP/posz', id: 'sp', args: ['y'] },
+    ],
+  });
+  m.map({ address: '/SP/posx', args: [2.5] });
+  m.map({ address: '/SP/posy', args: [1] });
+  assert.deepEqual(m.map({ address: '/SP/posz', args: [4] }).positions, [{ id: 'sp', x: 2.5, y: 4, z: 1 }]);
+  assert.equal(m.map({ address: '/SP/rotx', args: [0] }).matched, false);
+});
+
 test('drops an axis back to 0 once it has not been updated for staleMs', () => {
   const m = createMapper({
     staleMs: 1500,
