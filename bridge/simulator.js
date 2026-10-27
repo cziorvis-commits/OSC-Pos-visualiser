@@ -1,20 +1,24 @@
-// Sends fake tracking OSC (or PSN with --psn) so the visualiser can be tested without Naostage.
+// Sends fake tracking OSC (or PSN with --psn, FreeD with --freed) so the visualiser can be tested without Naostage.
 // Usage: npm run sim -- [host] [port] [trackers] [rateHz]
 //        npm run sim -- --psn [group] [port] [trackers] [rateHz]
+//        npm run sim -- --freed [host] [port] [trackers] [rateHz]
 import dgram from 'node:dgram';
+import * as freed from './freed.js';
 import { encodeBundle, encodeMessage } from './osc.js';
 import { encodeData, encodeInfo } from './psn.js';
 
 const args = process.argv.slice(2);
-const usePsn = args[0] === '--psn';
-if (usePsn) args.shift();
-const [host = usePsn ? '236.10.10.10' : '127.0.0.1', port = usePsn ? '56565' : '9111', count = '5', rate = '50'] = args;
+const protocol = { '--psn': 'PSN', '--freed': 'FreeD' }[args[0]] ?? 'OSC';
+if (protocol !== 'OSC') args.shift();
+const usePsn = protocol === 'PSN';
+const defaults = { OSC: ['127.0.0.1', '9111'], PSN: ['236.10.10.10', '56565'], FreeD: ['127.0.0.1', '40000'] }[protocol];
+const [host = defaults[0], port = defaults[1], count = '5', rate = '50'] = args;
 const n = Number(count);
 const sock = dgram.createSocket('udp4');
 const start = Date.now();
 let frame = 0;
 
-console.log(`Simulating ${n} trackers at ${rate} Hz as ${usePsn ? 'PSN' : 'OSC'} -> ${host}:${port} (Ctrl+C to stop)`);
+console.log(`Simulating ${n} trackers at ${rate} Hz as ${protocol} -> ${host}:${port} (Ctrl+C to stop)`);
 
 // Each performer wanders a different Lissajous path across a 14 x 10 m stage.
 function positions(t) {
@@ -30,7 +34,11 @@ function positions(t) {
 
 setInterval(() => {
   const ps = positions((Date.now() - start) / 1000);
-  if (usePsn) {
+  if (protocol === 'FreeD') {
+    // One D1 message per camera, panning to face the stage centre.
+    const packet = Buffer.concat(ps.map(({ id, x, y, z }) => freed.encode({ id, pos: { x, y, z }, pan: (Math.atan2(-x, 4 - y) * 180) / Math.PI })));
+    sock.send(packet, Number(port), host);
+  } else if (usePsn) {
     sock.send(encodeData(ps.map(({ id, x, y, z }) => ({ id, pos: { x, y, z } })), frame++), Number(port), host);
   } else {
     sock.send(encodeBundle(ps.map((p) => encodeMessage(`/tracker/${p.id}/pos`, [p.x, p.y, p.z]))), Number(port), host);

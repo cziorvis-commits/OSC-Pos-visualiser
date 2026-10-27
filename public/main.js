@@ -132,16 +132,19 @@ $('floorSave').addEventListener('click', async () => {
   }
 });
 
-// ---- Inputs: switch OSC / PSN on and off, and show what each is receiving ----
+// ---- Inputs: switch OSC / PSN / FreeD on and off, and show what each is receiving ----
 let inputStatus = {};
 const inputError = {}; // kind -> why the last switch failed, until the next one
 const inputLabels = {
   osc: () => ({ name: 'OSC', where: `:${config.oscPort ?? '?'}` }),
   psn: () => ({ name: 'PSN', where: config.psn ? `${config.psn.group}:${config.psn.port}` : '' }),
+  freed: () => ({ name: 'FreeD', where: `:${config.freed?.port ?? '?'}` }),
 };
+const inputKinds = Object.keys(inputLabels);
+const inputsOn = () => Object.fromEntries(inputKinds.map((k) => [k, config.inputs?.[k] ?? true]));
 
 function showInputs() {
-  for (const kind of ['osc', 'psn']) {
+  for (const kind of inputKinds) {
     const el = $(`input-${kind}`);
     const s = inputStatus[kind];
     const on = config.inputs?.[kind] ?? true;
@@ -161,8 +164,8 @@ function showInputs() {
       detail = s?.listening === false ? 'starting' : 'no data';
       tip = `Listening for ${name} on ${where}, nothing received${s?.from ? ` (last from ${s.from})` : ''}. Click to switch off.`;
     }
-    const other = config.inputs?.[kind === 'osc' ? 'psn' : 'osc'] ?? true;
-    if (on && !other) tip += ' (Switch the other input on first: at least one stays on.)';
+    const other = inputKinds.some((k) => k !== kind && inputsOn()[k]);
+    if (on && !other) tip += ' (Switch another input on first: at least one stays on.)';
     if (inputError[kind]) tip = inputError[kind];
     el.className = `input ${state}`;
     el.setAttribute('aria-pressed', String(on));
@@ -172,9 +175,9 @@ function showInputs() {
   }
 }
 
-for (const kind of ['osc', 'psn']) {
+for (const kind of inputKinds) {
   $(`input-${kind}`).addEventListener('click', async () => {
-    const next = { osc: config.inputs?.osc ?? true, psn: config.inputs?.psn ?? true };
+    const next = inputsOn();
     next[kind] = !next[kind];
     delete inputError[kind];
     try {

@@ -1,13 +1,14 @@
 # OSC Position Visualiser
 
-Live 3D view of tracking positions received as OSC or PSN (PosiStageNet). It's built for Naostage but works with any OSC or PSN sender.
+Live 3D view of tracking positions received as OSC, PSN (PosiStageNet) or FreeD. It's built for Naostage but works with any OSC, PSN or FreeD sender.
 
 ```
 Naostage ──UDP OSC (:9111)──────────────┐
-         ──PSN multicast (236.10.10.10:56565)─┴▶ bridge (Node) ──WebSocket──▶ browser (three.js, :8181)
+         ──PSN multicast (236.10.10.10:56565)─┤
+Camera   ──FreeD UDP (:40000)───────────────┴▶ bridge (Node) ──WebSocket──▶ browser (three.js, :8181)
 ```
 
-Browsers can't receive UDP, so a small Node bridge listens for OSC and PSN and relays them to the page.
+Browsers can't receive UDP, so a small Node bridge listens for OSC, PSN and FreeD and relays them to the page.
 Everything runs locally, including three.js, so the show network needs no internet.
 
 ## Start it (no commands)
@@ -32,9 +33,9 @@ The app runs the bridge in the background and lives in the menu bar. It still ne
 - The window opens at launch. Close it and the app stays in the menu bar; full screen is ⌃⌘F or the green button.
 - The menu bar menu opens with a small top-down plan for a quick check: the floor (downstage edge brighter), every tracker
   as a dot with its name, stale ones grey. Click it for the full view.
-- The menu also shows OSC and PSN status (click one to switch it on or off), and has Show Visualiser, Show Full Screen,
+- The menu also shows OSC, PSN and FreeD status (click one to switch it on or off), and has Show Visualiser, Show Full Screen,
   Open in Browser, Copy Link for Other Devices, Show config.json, Show Bridge Log, Restart Bridge, **Open at Login** and Quit.
-- The first time it runs, allow **Local Network** access when macOS asks. Without it no OSC or PSN arrives.
+- The first time it runs, allow **Local Network** access when macOS asks. Without it no OSC, PSN or FreeD arrives.
 - The app keeps its own `config.json` in `~/Library/Application Support/OSC Visualiser/`, starting as a copy of the one it was built with.
   The bridge log is in `~/Library/Logs/OSC Visualiser/bridge.log`.
 - Quitting the app stops its bridge. If a bridge from the launcher is already running, the app uses that one instead.
@@ -46,10 +47,11 @@ The app runs the bridge in the background and lives in the menu bar. It still ne
 npm start            # same as the launcher
 npm run sim          # sends 5 fake moving trackers to 127.0.0.1:9111
 npm run sim -- --psn # the same trackers as PSN to 236.10.10.10:56565
+npm run sim -- --freed # the same trackers as FreeD cameras to 127.0.0.1:40000
 npm test
 ```
 
-To change where the simulator sends, run `npm run sim -- <host> <port> <trackers> <rateHz>` (after `--psn` if used). The app has no npm dependencies.
+To change where the simulator sends, run `npm run sim -- <host> <port> <trackers> <rateHz>` (after `--psn` or `--freed` if used). The app has no npm dependencies.
 
 ## Network setup (Naostage)
 
@@ -69,15 +71,24 @@ Each PSN tracker shows up as the address `/psn/<id>/pos` and gets the id `psn:<i
 Its label is the tracker name Naostage sends; `names` in config.json overrides it, for example `{ "psn:1": "Lead" }`.
 Positions are used as sent: Kratos sends z as height, which already matches the stage axes. Use `transform` if anything is flipped.
 
+### FreeD
+
+The bridge listens for FreeD on UDP port **40000** (`freed.port` in config.json; changing it needs a restart).
+Point the camera tracking system's FreeD output at the laptop's IP on that port.
+Each D1 message (position and orientation) becomes the address `/freed/<camera id>/pos` and the id `freed:<camera id>`.
+Its arguments are x, y and z in metres, then pan, tilt and roll in degrees, then the raw zoom and focus values;
+the default mapping uses only x, y and z. FreeD's z is height, so it matches the stage axes. Packets with a bad checksum
+show as `(undecodable FreeD)` in the OSC monitor.
+
 ### Table
 
-Click **Table** for the exact live values of every tracker: name and id, input (OSC or PSN), the mapping it matched, the sender's IP,
+Click **Table** for the exact live values of every tracker: name and id, input (OSC, PSN or FreeD), the mapping it matched, the sender's IP,
 x, y and z in stage metres to 0.1 mm, its real update rate, and how long since the last update. Stale rows grey out.
 **Freeze** holds the values so you can read or copy them; **Clear** forgets trackers that have stopped.
 
-### Choosing OSC, PSN or both
+### Choosing inputs
 
-The **OSC** and **PSN** buttons next to the connection status switch each input on or off. The choice is saved to `inputs` in `config.json`.
+The **OSC**, **PSN** and **FreeD** buttons next to the connection status switch each input on or off. The choice is saved to `inputs` in `config.json`.
 Each button also shows that input's status (hover for the sender's IP):
 
 | Look | Meaning |
@@ -87,7 +98,7 @@ Each button also shows that input's status (hover for the sender's IP):
 | red, `error` | Can't listen on that port (hover for the reason) |
 | grey dashed, `off` / `off · 240 Hz available` | Switched off. If data is still arriving it shows the rate, so you know it's there to switch to |
 
-At least one input stays on. Both always listen, so switching is instant and needs no restart.
+At least one input stays on. All of them always listen, so switching is instant and needs no restart.
 
 ## config.json
 
@@ -96,8 +107,9 @@ Changes take effect live, with no restart needed.
 | Key | Meaning |
 | --- | --- |
 | `oscPort` / `httpPort` | UDP listen port / web UI port |
-| `inputs` | Which protocols feed the view: `{ "osc": true, "psn": true }`. Set with the input toggles (see below) |
+| `inputs` | Which protocols feed the view: `{ "osc": true, "psn": true, "freed": true }`. Set with the input toggles (see below) |
 | `psn` | Multicast `group` and `port` for PSN input. Changes here need a restart |
+| `freed` | UDP `port` for FreeD input (default 40000). Changes here need a restart |
 | `stage` | `width`, `depth` and `height` in metres (default 3.66 × 3.66 LED floor). `origin` is the floor's reference point: `"downstage-centre"` or `"centre"`. `position` `[x,y]` is where that point sits in tracking coordinates and `rotation` is degrees anticlockwise seen from above; set them all with the **Floor** panel (see below) |
 | `transform` | Maps incoming axes onto stage axes. `x`, `y` and `z` each take a value such as `"x"`, `"-y"` or `"z"`. Also takes `scale` (for example `0.001` for mm) and `offset` `[x,y,z]` |
 | `mappings` | Which OSC addresses carry positions (see below) |
@@ -144,8 +156,9 @@ The floor moves; tracker positions are always drawn exactly as received. To matc
 - `bridge/ws.js`: minimal built-in WebSocket server
 - `bridge/osc.js`: OSC codec for messages and bundles, with no dependencies
 - `bridge/psn.js`: PosiStageNet codec for tracker positions and names
+- `bridge/freed.js`: FreeD codec for D1 camera position and orientation messages
 - `bridge/mapper.js`: maps addresses to tracker positions and applies the axis transform
 - `bridge/stage-file.js`: saves the **Floor** panel's size and placement into the `stage` block of `config.json`
-- `bridge/simulator.js`: sends test OSC or PSN
+- `bridge/simulator.js`: sends test OSC, PSN or FreeD
 - `macos/`: the menu bar app (`main.swift`), its `Info.plist`, icon and `build.sh`
 - `public/`: the three.js UI (`scene.js`), the OSC monitor (`monitor.js`) and the Table view (`table.js`); `vendor/` holds three.js r160

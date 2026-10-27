@@ -1,4 +1,4 @@
-// OSC (UDP) and PSN (multicast) -> WebSocket bridge, and static file server for the UI.
+// OSC (UDP), PSN (multicast) and FreeD (UDP) -> WebSocket bridge, and static file server for the UI.
 import { exec } from 'node:child_process';
 import dgram from 'node:dgram';
 import fs from 'node:fs';
@@ -8,9 +8,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createWebSocketServer } from './ws.js';
 import { decode } from './osc.js';
+import * as freed from './freed.js';
 import * as psn from './psn.js';
 import { createMapper } from './mapper.js';
-import { parseInputs, parsePlacement, updateBlockText, updateStageText } from './stage-file.js';
+import { INPUTS, parseInputs, parsePlacement, updateBlockText, updateStageText } from './stage-file.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = process.env.CONFIG || path.join(root, 'config.json');
@@ -45,6 +46,7 @@ function clientConfig() {
     names: { ...psnNames, ...names },
     inputs: inputsOn(),
     psn: { group, port },
+    freed: { port: freedPort() },
   };
 }
 
@@ -53,12 +55,19 @@ function psnSettings() {
   return { group: p.group ?? '236.10.10.10', port: p.port ?? 56565 };
 }
 
-// Which protocols feed the 3D view. Both sockets always listen, so the UI can show
-// that the other protocol is available even while it's switched off.
+function freedPort() {
+  return config.freed?.port ?? 40000;
+}
+
+// Which protocols feed the 3D view. Every socket always listens, so the UI can show
+// that a protocol is available even while it's switched off.
 function inputsOn() {
   const i = config.inputs ?? {};
-  return { osc: i.osc !== false, psn: i.psn !== false };
+  return Object.fromEntries(INPUTS.map((kind) => [kind, i[kind] !== false]));
 }
+
+const onOff = (inputs) => INPUTS.map((kind) => `${inputNames[kind]} ${inputs[kind] ? 'on' : 'off'}`).join(', ');
+const inputNames = { osc: 'OSC', psn: 'PSN', freed: 'FreeD' };
 
 // ---- HTTP (static UI) ----
 const types = {
@@ -93,7 +102,7 @@ function saveStage(body) {
   return placement;
 }
 
-// POST /inputs { osc, psn } from the input toggles -> config.json. Applied straight away
+// POST /inputs { osc, psn, freed } from the input toggles -> config.json. Applied straight away
 // rather than waiting for the file watcher, so the switch feels instant.
 function saveInputs(body) {
   const inputs = parseInputs(body);
@@ -101,7 +110,7 @@ function saveInputs(body) {
   config = { ...config, inputs };
   broadcast({ type: 'config', config: clientConfig() });
   broadcastInputStatus();
-  console.log(`Inputs: OSC ${inputs.osc ? 'on' : 'off'}, PSN ${inputs.psn ? 'on' : 'off'}`);
+  console.log(`Inputs: ${onOff(inputs)}`);
   return inputs;
 }
 
@@ -162,6 +171,7 @@ setInterval(() => {
 const inputStats = {
   osc: { listening: false, error: null, count: 0, hz: 0, from: null, last: 0 },
   psn: { listening: false, error: null, count: 0, hz: 0, from: null, last: 0 },
+  freed: { listening: false, error: null, count: 0, hz: 0, from: null, last: 0 },
 };
 
 function countPacket(kind, from, t) {
@@ -195,8 +205,9 @@ setInterval(() => {
 // ---- OSC over UDP ----
 const udp = dgram.createSocket('udp4');
 
-// OSC and PSN both end up here as { address, args } messages. `src` is 'osc' or 'psn'.
-// PSN tracker ids get a 'psn:' prefix so PSN target 1 and OSC tracker 1 stay separate.
+// OSC, PSN and FreeD all end up here as { address, args } messages. `src` is 'osc', 'psn'
+// or 'freed'. PSN and FreeD ids get a 'psn:' / 'freed:' prefix so PSN target 1, FreeD
+// camera 1 and OSC tracker 1 stay separate.
 function handleMessage(msg, from, t, src) {
   const { matched, positions, feeds } = mapper.map(msg, t);
   for (const f of feeds) pendingFeeds[f] = (pendingFeeds[f] ?? 0) + 1;
@@ -205,7 +216,7 @@ function handleMessage(msg, from, t, src) {
     pendingRaw.push({ from, address: msg.address, args, t, matched });
   }
   positions.forEach((p, i) => {
-    const id = src === 'psn' ? `psn:${p.id}` : p.id;
+    const id = src === 'osc' ? p.id : `${src}:${p.id}`;
     const n = (pendingPos.get(id)?.n ?? 0) + 1;
     pendingPos.set(id, { ...p, id, t, n, src, from, feed: feeds[i] });
   });
@@ -308,6 +319,36 @@ function startPsn() {
   });
 }
 
+// ---- FreeD over UDP ----
+// Each FreeD camera becomes a /freed/{id}/pos message (x, y, z in metres, then pan,
+// tilt, roll in degrees, zoom and focus), so it goes through the same mappings,
+// transform and monitor as OSC. Changing the port needs a restart.
+const freedSocket = dgram.createSocket('udp4');
+
+freedSocket.on('message', (buf, rinfo) => {
+  const t = Date.now();
+  countPacket('freed', rinfo.address, t);
+  if (!inputsOn().freed) return;
+  let cameras;
+  try {
+    cameras = freed.decode(buf);
+  } catch (err) {
+    pendingRaw.push({ from: rinfo.address, address: '(undecodable FreeD)', args: [err.message], t, matched: false });
+    return;
+  }
+  for (const { id, pos, pan, tilt, roll, zoom, focus } of cameras) {
+    handleMessage({ address: `/freed/${id}/pos`, args: [pos.x, pos.y, pos.z, pan, tilt, roll, zoom, focus] }, rinfo.address, t, 'freed');
+  }
+});
+
+freedSocket.on('error', (err) => {
+  // Keep OSC and PSN running even if FreeD can't listen.
+  console.error(`FreeD: cannot listen on UDP ${freedPort()}: ${err.message}`);
+  inputStats.freed.listening = false;
+  inputStats.freed.error = err.message;
+  freedSocket.close();
+});
+
 // The menu bar app starts the bridge with a pipe on stdin: when the app quits or
 // crashes the pipe closes, and the bridge goes with it instead of lingering.
 if (process.env.EXIT_WITH_STDIN) {
@@ -343,8 +384,12 @@ server.listen(config.httpPort, () => {
     inputStats.osc.listening = true;
   });
   startPsn();
-  const on = inputsOn();
-  console.log(`Inputs: OSC ${on.osc ? 'on' : 'off'}, PSN ${on.psn ? 'on' : 'off'} (switch them in the UI)`);
+  const port = freedPort();
+  freedSocket.bind(port, '0.0.0.0', () => {
+    console.log(`Listening for FreeD on UDP 0.0.0.0:${port}`);
+    inputStats.freed.listening = true;
+  });
+  console.log(`Inputs: ${onOff(inputsOn())} (switch them in the UI)`);
   const ips = Object.values(os.networkInterfaces())
     .flat()
     .filter((i) => i && i.family === 'IPv4' && !i.internal)

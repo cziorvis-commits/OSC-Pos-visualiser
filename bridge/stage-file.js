@@ -18,12 +18,17 @@ export function parsePlacement(body) {
   return { ...out, position: position.map(mm), rotation: Math.round(rotation * 10) / 10 || 0 };
 }
 
-// Checks an { osc, psn } body of booleans; at least one input has to stay on.
+export const INPUTS = ['osc', 'psn', 'freed'];
+
+// Checks an { osc, psn, freed } body of booleans; at least one input has to stay on.
 export function parseInputs(body) {
-  const { osc, psn } = body ?? {};
-  if (typeof osc !== 'boolean' || typeof psn !== 'boolean') throw new Error('osc and psn must be true or false');
-  if (!osc && !psn) throw new Error('keep at least one input on');
-  return { osc, psn };
+  const out = {};
+  for (const kind of INPUTS) {
+    if (typeof body?.[kind] !== 'boolean') throw new Error(`${INPUTS.join(', ')} must each be true or false`);
+    out[kind] = body[kind];
+  }
+  if (!Object.values(out).some(Boolean)) throw new Error('keep at least one input on');
+  return out;
 }
 
 function formatBlock(key, obj) {

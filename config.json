@@ -4,9 +4,11 @@
 
   "inputs": {
     "osc": false,
-    "psn": true
+    "psn": true,
+    "freed": true
   },
   "psn": { "group": "236.10.10.10", "port": 56565 },
+  "freed": { "port": 40000 },
 
   "stage": {
     "width": 3.66,
@@ -27,6 +29,7 @@
 
   "mappings": [
     { "address": "/psn/{id}/pos", "args": ["x", "y", "z"] },
+    { "address": "/freed/{id}/pos", "args": ["x", "y", "z"] },
     { "address": "/kratos/targets/{id}/position", "args": ["x", "y", "z"] },
     { "address": "/SP/posx", "id": "sp", "args": ["x"] },
     { "address": "/SP/posy", "id": "sp", "args": ["z"] },

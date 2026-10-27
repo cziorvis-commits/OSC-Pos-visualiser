@@ -54,11 +54,12 @@ test('accepts an optional floor size and rejects silly ones', () => {
 });
 
 test('saves the input selection into its own block, and keeps one input on', () => {
-  const next = updateBlockText(CONFIG, 'inputs', parseInputs({ osc: false, psn: true }));
-  assert.deepEqual(JSON.parse(next).inputs, { osc: false, psn: true });
+  const next = updateBlockText(CONFIG, 'inputs', parseInputs({ osc: false, psn: true, freed: false }));
+  assert.deepEqual(JSON.parse(next).inputs, { osc: false, psn: true, freed: false });
   assert.deepEqual(JSON.parse(next).stage, JSON.parse(CONFIG).stage);
-  const again = updateBlockText(next, 'inputs', { osc: true, psn: true });
-  assert.match(again, /"inputs": \{\n    "osc": true,\n    "psn": true\n  \}/);
-  assert.throws(() => parseInputs({ osc: false, psn: false }), /at least one/);
-  assert.throws(() => parseInputs({ osc: 'yes', psn: true }), /true or false/);
+  const again = updateBlockText(next, 'inputs', { osc: true, psn: true, freed: true });
+  assert.match(again, /"inputs": \{\n    "osc": true,\n    "psn": true,\n    "freed": true\n  \}/);
+  assert.throws(() => parseInputs({ osc: false, psn: false, freed: false }), /at least one/);
+  assert.throws(() => parseInputs({ osc: 'yes', psn: true, freed: true }), /true or false/);
+  assert.throws(() => parseInputs({ osc: true, psn: true }), /true or false/);
 });

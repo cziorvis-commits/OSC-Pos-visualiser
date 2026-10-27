@@ -73,7 +73,7 @@ export function createTable(root, colorOf) {
       cell(tr, '', 'swatch').innerHTML = `<span style="background:${colorOf(id)}"></span>`;
       const name = cell(tr, config.names?.[id] ?? id, 'name');
       if (config.names?.[id]) name.appendChild(Object.assign(document.createElement('small'), { textContent: `#${id}` }));
-      cell(tr, (p.src ?? '?').toUpperCase(), `src ${p.src ?? ''}`);
+      cell(tr, p.src === 'freed' ? 'FreeD' : (p.src ?? '?').toUpperCase(), `src ${p.src ?? ''}`);
       cell(tr, p.feed ?? '');
       cell(tr, p.from ?? '');
       cell(tr, fmt(p.x), 'num');

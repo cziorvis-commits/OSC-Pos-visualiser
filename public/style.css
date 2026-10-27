@@ -153,6 +153,7 @@ button.input:disabled { opacity: 1; cursor: not-allowed; }
 #liveTable .src { font-weight: 700; font-size: 11px; }
 #liveTable .src.osc { color: var(--accent); }
 #liveTable .src.psn { color: #d2a8ff; }
+#liveTable .src.freed { color: #ffa657; }
 #freezeTable.active { color: var(--warn); border-color: var(--warn); }
 
 #monitor {

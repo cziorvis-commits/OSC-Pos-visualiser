@@ -259,9 +259,12 @@ final class StatusClient {
 
   var staleSeconds: Double { (config["staleMs"] as? Double ?? 1500) / 1000 }
 
+  static let kinds = ["osc", "psn", "freed"]
+  static let names = ["osc": "OSC", "psn": "PSN", "freed": "FreeD"]
+
   var inputsOn: [String: Bool] {
     let i = config["inputs"] as? [String: Bool] ?? [:]
-    return ["osc": i["osc"] ?? true, "psn": i["psn"] ?? true]
+    return Dictionary(uniqueKeysWithValues: Self.kinds.map { ($0, i[$0] ?? true) })
   }
 
   func setInputs(_ inputs: [String: Bool]) {
@@ -276,12 +279,13 @@ final class StatusClient {
 
   // Same wording as the pills in the web UI.
   func describe(_ kind: String) -> (name: String, detail: String, look: Look) {
-    let name = kind.uppercased()
+    let name = Self.names[kind] ?? kind.uppercased()
     var whereText = ""
     if kind == "osc", let p = config["oscPort"] as? Int { whereText = ":\(p)" }
     if kind == "psn", let psn = config["psn"] as? [String: Any], let g = psn["group"] as? String, let p = psn["port"] as? Int {
       whereText = "\(g):\(p)"
     }
+    if kind == "freed", let freed = config["freed"] as? [String: Any], let p = freed["port"] as? Int { whereText = ":\(p)" }
     guard let s = status[kind] else { return (name, "\(whereText)  ·  bridge not connected", .waiting) }
     let hz = s["hz"] as? Int ?? 0
     let receiving = (s["ago"] as? Int).map { $0 < 2000 } ?? false
@@ -371,7 +375,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     guard let button = statusItem?.button else { return }
     let running: Bool
     if case .running = bridge.state { running = true } else { running = false }
-    let anyLive = ["osc", "psn"].contains { status.describe($0).look == .live }
+    let anyLive = StatusClient.kinds.contains { status.describe($0).look == .live }
     let symbol = running ? "dot.radiowaves.left.and.right" : "exclamationmark.triangle"
     let image = NSImage(systemSymbolName: symbol, accessibilityDescription: appName)
     image?.isTemplate = true
@@ -418,8 +422,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     let inputsHeader = NSMenuItem(title: "Inputs (click to switch on or off)", action: nil, keyEquivalent: "")
     inputsHeader.isEnabled = false
     menu.addItem(inputsHeader)
-    for kind in ["osc", "psn"] {
-      let item = NSMenuItem(title: kind.uppercased(), action: #selector(toggleInput(_:)), keyEquivalent: "")
+    for kind in StatusClient.kinds {
+      let item = NSMenuItem(title: StatusClient.names[kind] ?? kind.uppercased(), action: #selector(toggleInput(_:)), keyEquivalent: "")
       item.target = self
       item.representedObject = kind
       menu.addItem(item)
@@ -478,8 +482,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
       item.image = dot(d.look)
       item.state = (on[kind] ?? true) ? .on : .off
       // At least one input stays on, and switching needs a connected bridge.
-      let other = kind == "osc" ? "psn" : "osc"
-      item.isEnabled = !status.status.isEmpty && !((on[kind] ?? true) && !(on[other] ?? true))
+      let anotherOn = StatusClient.kinds.contains { $0 != kind && (on[$0] ?? true) }
+      item.isEnabled = !status.status.isEmpty && !((on[kind] ?? true) && !anotherOn)
     }
   }
 
