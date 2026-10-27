@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlacement, updateStageText } from '../bridge/stage-file.js';
+import { parseInputs, parsePlacement, updateBlockText, updateStageText } from '../bridge/stage-file.js';
 
 const CONFIG = `{
   "oscPort": 9111,
@@ -51,4 +51,15 @@ test('accepts an optional floor size and rejects silly ones', () => {
   assert.throws(() => parsePlacement({ width: 3, depth: 'big', position: [0, 0], rotation: 0 }), /depth/);
   const next = updateStageText(CONFIG, parsePlacement({ width: 6, depth: 4, position: [0, 0], rotation: 0 }));
   assert.deepEqual([JSON.parse(next).stage.width, JSON.parse(next).stage.depth], [6, 4]);
+});
+
+test('saves the input selection into its own block, and keeps one input on', () => {
+  const next = updateBlockText(CONFIG, 'inputs', parseInputs({ osc: false, psn: true, freed: false }));
+  assert.deepEqual(JSON.parse(next).inputs, { osc: false, psn: true, freed: false });
+  assert.deepEqual(JSON.parse(next).stage, JSON.parse(CONFIG).stage);
+  const again = updateBlockText(next, 'inputs', { osc: true, psn: true, freed: true });
+  assert.match(again, /"inputs": \{\n    "osc": true,\n    "psn": true,\n    "freed": true\n  \}/);
+  assert.throws(() => parseInputs({ osc: false, psn: false, freed: false }), /at least one/);
+  assert.throws(() => parseInputs({ osc: 'yes', psn: true, freed: true }), /true or false/);
+  assert.throws(() => parseInputs({ osc: true, psn: true }), /true or false/);
 });

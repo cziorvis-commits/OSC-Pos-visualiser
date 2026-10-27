@@ -14,12 +14,18 @@
 
   <header id="status">
     <span id="conn" class="pill bad">disconnected</span>
+    <span class="inputs" role="group" aria-label="Inputs">
+      <button id="input-osc" class="input" data-kind="osc" aria-pressed="true">OSC</button>
+      <button id="input-psn" class="input" data-kind="psn" aria-pressed="true">PSN</button>
+      <button id="input-freed" class="input" data-kind="freed" aria-pressed="true">FreeD</button>
+    </span>
     <span id="summary"></span>
     <span class="spacer"></span>
     <button id="resetView" title="Reset camera">Reset view</button>
     <button id="topView" title="Top-down plan view">Top</button>
     <button id="toggleTrails">Trails: on</button>
     <button id="toggleFloor" title="Set the floor size and line it up with the real stage">Floor</button>
+    <button id="toggleTable" title="Exact live values for every tracker">Table</button>
     <button id="toggleMonitor">OSC monitor</button>
   </header>
 
@@ -42,6 +48,29 @@
       <span class="spacer"></span>
       <button id="floorRevert">Revert</button>
       <button id="floorSave" class="primary">Save</button>
+    </div>
+  </aside>
+
+  <aside id="table" hidden>
+    <div class="table-head">
+      <strong>Live data</strong>
+      <small>stage coordinates, metres</small>
+      <span class="spacer"></span>
+      <button id="freezeTable" title="Hold the values so you can read or copy them">Freeze</button>
+      <button id="clearTable" title="Forget trackers that are no longer sending">Clear</button>
+    </div>
+    <div class="table-scroll">
+      <table id="liveTable">
+        <colgroup>
+          <col class="c-swatch"><col class="c-name"><col class="c-src"><col class="c-addr"><col class="c-from">
+          <col class="c-xyz"><col class="c-xyz"><col class="c-xyz"><col class="c-hz"><col class="c-age">
+        </colgroup>
+        <thead><tr>
+          <th></th><th>Tracker</th><th>Input</th><th>Address</th><th>From</th>
+          <th class="num">X</th><th class="num">Y</th><th class="num">Z</th><th class="num">Hz</th><th class="num">Age</th>
+        </tr></thead>
+        <tbody><tr class="empty"><td colspan="10">No trackers yet</td></tr></tbody>
+      </table>
     </div>
   </aside>
 

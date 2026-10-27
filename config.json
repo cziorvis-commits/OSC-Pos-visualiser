@@ -2,6 +2,14 @@
   "oscPort": 9111,
   "httpPort": 8181,
 
+  "inputs": {
+    "osc": false,
+    "psn": true,
+    "freed": true
+  },
+  "psn": { "group": "236.10.10.10", "port": 56565 },
+  "freed": { "port": 40000 },
+
   "stage": {
     "width": 3.66,
     "depth": 3.66,
@@ -20,7 +28,12 @@
   },
 
   "mappings": [
+    { "address": "/psn/{id}/pos", "args": ["x", "y", "z"] },
+    { "address": "/freed/{id}/pos", "args": ["x", "y", "z"] },
     { "address": "/kratos/targets/{id}/position", "args": ["x", "y", "z"] },
+    { "address": "/SP/posx", "id": "sp", "args": ["x"] },
+    { "address": "/SP/posy", "id": "sp", "args": ["z"] },
+    { "address": "/SP/posz", "id": "sp", "args": ["y"] },
     { "address": "/pos/xyz", "id": "xyz", "args": ["x", "y", "z"] },
     { "address": "/pos/xy", "id": "xyz", "args": ["x", "y"] },
     { "address": "/pos/x", "id": "xyz", "args": ["x"] },
@@ -32,7 +45,7 @@
     { "address": "/tracker/{id}/z", "args": ["z"] }
   ],
 
-  "names": {},
+  "names": { "sp": "SP Grid" },
 
   "trailSeconds": 3,
   "staleMs": 1500

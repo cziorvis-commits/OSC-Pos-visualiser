@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node bridge/server.js --open",
     "sim": "node bridge/simulator.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "app": "bash macos/build.sh"
   },
   "engines": {
     "node": ">=20"
