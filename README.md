@@ -115,6 +115,7 @@ Changes take effect live, with no restart needed.
 | `mappings` | Which OSC addresses carry positions (see below) |
 | `names` | Display names, for example `{ "1": "Lead", "psn:2": "Dancer A" }` |
 | `trailSeconds` / `staleMs` | Trail length, and how long a tracker can go without data before it greys out |
+| `idleFadeSeconds` | A tracker that stays within 5 mm of the same spot this long (default 30) fades out of the 3D view, e.g. leftovers from an earlier session that a sender keeps repeating. It comes back as soon as it moves. `0` turns this off |
 
 Stage axes: **x** runs across the stage, **y** is depth (upstage is positive) and **z** is height.
 

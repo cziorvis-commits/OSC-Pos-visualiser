@@ -19,8 +19,12 @@ $('toggleTrails').addEventListener('click', (e) => {
   e.target.textContent = `Trails: ${trailsOn ? 'on' : 'off'}`;
 });
 
+$('clearIdle').addEventListener('click', () => {
+  table.remove(view.clearIdle());
+});
+
 const tableEl = $('table');
-const table = createTable(tableEl, (id) => view.colorOf(id));
+const table = createTable(tableEl, (id) => view.colorOf(id), (id) => view.isIdle(id));
 $('toggleTable').addEventListener('click', (e) => {
   tableEl.hidden = !tableEl.hidden;
   e.target.classList.toggle('active', !tableEl.hidden);
@@ -229,8 +233,8 @@ function connect() {
       showInputs();
     } else if (msg.type === 'batch') {
       const now = performance.now();
-      for (const p of msg.pos) view.updateTracker(p.id, p, config.names?.[p.id], now);
-      table.add(msg.pos, now);
+      const shown = msg.pos.filter((p) => view.updateTracker(p.id, p, config.names?.[p.id], now));
+      table.add(shown, now);
       for (const [f, n] of Object.entries(msg.feeds ?? {})) {
         const e = feeds.get(f) ?? { count: 0, hz: 0, last: 0 };
         e.count += n;
@@ -260,9 +264,10 @@ function feedText(now) {
 
 function frame() {
   const now = performance.now();
-  const { total, live } = view.render(now, config);
+  const { total, live, idle } = view.render(now, config);
   table.render(now, config);
-  $('summary').textContent = `${live} live / ${total} trackers · ${feedText(now)}`;
+  $('clearIdle').disabled = !idle;
+  $('summary').textContent = `${live} live / ${total} trackers${idle ? ` (${idle} idle, hidden)` : ''} · ${feedText(now)}`;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

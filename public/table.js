@@ -19,7 +19,7 @@ function cell(tr, text, className) {
   return td;
 }
 
-export function createTable(root, colorOf) {
+export function createTable(root, colorOf, isIdle = () => false) {
   const tbody = root.querySelector('tbody');
   const freezeBtn = root.querySelector('#freezeTable');
   const rows = new Map(); // id -> { p, seen, src, from, feed, windowCount, hz }
@@ -69,7 +69,9 @@ export function createTable(root, colorOf) {
       const { p, seen, hz } = rows.get(id);
       const age = now - seen;
       const tr = document.createElement('tr');
-      if (age > staleMs) tr.className = 'stale';
+      tr.classList.toggle('stale', age > staleMs);
+      tr.classList.toggle('idle', isIdle(id));
+      if (isIdle(id)) tr.title = 'Not moved for a while, so hidden in the 3D view';
       cell(tr, '', 'swatch').innerHTML = `<span style="background:${colorOf(id)}"></span>`;
       const name = cell(tr, config.names?.[id] ?? id, 'name');
       if (config.names?.[id]) name.appendChild(Object.assign(document.createElement('small'), { textContent: `#${id}` }));
@@ -85,5 +87,10 @@ export function createTable(root, colorOf) {
     }
   }
 
-  return { add, render };
+  function remove(ids) {
+    for (const id of ids) rows.delete(id);
+    lastDraw = 0;
+  }
+
+  return { add, render, remove };
 }

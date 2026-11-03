@@ -12,6 +12,8 @@ const PALETTE = [
 ];
 const STALE_COLOR = new THREE.Color(0x555b66);
 const MAX_TRAIL_POINTS = 600;
+const IDLE_MOVE_M = 0.005; // moving less than this doesn't count as moving (sensor jitter)
+const IDLE_FADE_MS = 2000; // how long the fade-out takes once a tracker counts as idle
 
 function toThree(p, out = new THREE.Vector3()) {
   return out.set(p.x, p.z, -p.y);
@@ -61,6 +63,9 @@ export function createScene(container) {
   let onPlacementChange = () => {};
 
   const trackers = new Map();
+  // Trackers cleared as idle: id -> where they sat. Updates from that same spot are
+  // ignored, so a sender repeating an old position doesn't bring them back.
+  const cleared = new Map();
   let trailsOn = true;
 
   function resize() {
@@ -231,7 +236,7 @@ export function createScene(container) {
     const color = new THREE.Color(PALETTE[trackers.size % PALETTE.length]);
     const group = new THREE.Group();
 
-    const headMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4 });
+    const headMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, transparent: true });
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 24, 16), headMat);
     group.add(head);
 
@@ -267,17 +272,30 @@ export function createScene(container) {
       history: [], // { v: Vector3, t }
       lastSeen: 0,
       stale: false,
+      anchor: null, // where it last moved to; moving IDLE_MOVE_M away from it counts as moving
+      lastMoved: 0,
+      fade: 1, // 1 = fully shown, 0 = faded out as idle
       stage: { x: 0, y: 0, z: 0 },
     };
     trackers.set(id, t);
     return t;
   }
 
+  // Returns false when the update was ignored (a cleared tracker still sitting still).
   function updateTracker(id, p, name, now) {
+    const spot = cleared.get(id);
+    if (spot) {
+      if (spot.distanceTo(toThree(p)) <= IDLE_MOVE_M) return false;
+      cleared.delete(id);
+    }
     const t = trackers.get(id) || createTracker(id);
     t.stage = p;
     t.lastSeen = now;
     const v = toThree(p);
+    if (!t.anchor || t.anchor.distanceTo(v) > IDLE_MOVE_M) {
+      t.anchor = v.clone();
+      t.lastMoved = now;
+    }
     t.group.position.copy(v);
     t.ring.position.set(v.x, 0.002, v.z);
     const pp = t.pole.geometry.attributes.position;
@@ -291,6 +309,28 @@ export function createScene(container) {
       if (t.history.length > MAX_TRAIL_POINTS) t.history.shift();
     }
     t.labelEl.innerHTML = `${name ?? id} <small>${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}</small>`;
+    return true;
+  }
+
+  // Remove every idle tracker from the scene; returns the ids removed.
+  function clearIdle() {
+    const ids = [];
+    for (const t of trackers.values()) {
+      if (t.fade === 1) continue;
+      cleared.set(t.id, t.anchor ?? toThree(t.stage));
+      for (const o of [t.group, t.ring, t.pole, t.trail]) {
+        scene.remove(o);
+        o.traverse((c) => {
+          c.geometry?.dispose();
+          c.material?.dispose();
+        });
+      }
+      t.group.remove(t.label);
+      t.labelEl.remove();
+      trackers.delete(t.id);
+      ids.push(t.id);
+    }
+    return ids;
   }
 
   function setStale(t, stale) {
@@ -311,25 +351,43 @@ export function createScene(container) {
       const h = t.history[i];
       t.trailPos.set([h.v.x, h.v.y, h.v.z], i * 3);
       const a = 1 - (now - h.t) / trailMs;
-      t.trailCol.set([c.r, c.g, c.b, Math.max(0, a) * 0.9], i * 4);
+      t.trailCol.set([c.r, c.g, c.b, Math.max(0, a) * 0.9 * t.fade], i * 4);
     }
     t.trailGeom.attributes.position.needsUpdate = true;
     t.trailGeom.attributes.color.needsUpdate = true;
     t.trailGeom.setDrawRange(0, n);
   }
 
+  // Fade a tracker out once it has sat still for idleMs; it pops back when it moves.
+  function setFade(t, now, idleMs) {
+    const still = now - t.lastMoved - idleMs;
+    const fade = idleMs > 0 && still > 0 ? Math.max(0, 1 - still / IDLE_FADE_MS) : 1;
+    if (fade === t.fade) return;
+    t.fade = fade;
+    const shown = fade > 0;
+    t.headMat.opacity = fade;
+    t.headMat.depthWrite = fade === 1;
+    t.ringMat.opacity = 0.5 * fade;
+    t.poleMat.opacity = 0.6 * fade;
+    t.labelEl.style.opacity = fade === 1 ? '' : String(fade);
+    for (const o of [t.group, t.ring, t.pole, t.trail, t.label]) o.visible = shown;
+  }
+
   // Called every animation frame.
-  function render(now, { trailSeconds = 3, staleMs = 1500 } = {}) {
+  function render(now, { trailSeconds = 3, staleMs = 1500, idleFadeSeconds = 30 } = {}) {
     let live = 0;
+    let idle = 0;
     for (const t of trackers.values()) {
       setStale(t, now - t.lastSeen > staleMs);
-      if (!t.stale) live++;
+      setFade(t, now, idleFadeSeconds * 1000);
+      if (t.fade < 1) idle++;
+      else if (!t.stale) live++;
       updateTrail(t, now, trailSeconds * 1000);
     }
     controls.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
-    return { total: trackers.size, live };
+    return { total: trackers.size, live, idle };
   }
 
   function setTrails(on) {
@@ -340,6 +398,12 @@ export function createScene(container) {
   function colorOf(id) {
     const t = trackers.get(id);
     return t ? `#${(t.stale ? STALE_COLOR : t.color).getHexString()}` : 'transparent';
+  }
+
+  // True once a tracker has started fading out for not moving.
+  function isIdle(id) {
+    const t = trackers.get(id);
+    return !!t && t.fade < 1;
   }
 
   function relabel(names = {}) {
@@ -353,7 +417,7 @@ export function createScene(container) {
   resetView();
 
   return {
-    setStage, setPlacement, getPlacement, getFloor, setSize, setEditing, resetView, topView, updateTracker, render, setTrails, relabel, colorOf,
+    setStage, setPlacement, getPlacement, getFloor, setSize, setEditing, resetView, topView, updateTracker, render, setTrails, relabel, colorOf, isIdle, clearIdle,
     onPlacement(fn) { onPlacementChange = fn; },
   };
 }

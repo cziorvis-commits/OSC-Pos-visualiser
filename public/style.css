@@ -149,6 +149,7 @@ button.input:disabled { opacity: 1; cursor: not-allowed; }
 #liveTable td.name small { color: var(--muted); margin-left: 6px; }
 #liveTable tr.stale td { color: var(--muted); }
 #liveTable tr.stale td.age { color: var(--warn); }
+#liveTable tr.idle td { opacity: 0.45; }
 #liveTable tr.empty td { color: var(--muted); text-align: center; padding: 10px; }
 #liveTable .src { font-weight: 700; font-size: 11px; }
 #liveTable .src.osc { color: var(--accent); }
