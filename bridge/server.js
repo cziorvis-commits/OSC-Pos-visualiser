@@ -39,10 +39,10 @@ fs.watchFile(configPath, { interval: 500 }, () => {
 });
 
 function clientConfig() {
-  const { stage, names, trailSeconds, staleMs, oscPort } = config;
+  const { stage, names, trailSeconds, staleMs, idleFadeSeconds, oscPort } = config;
   const { group, port } = psnSettings();
   return {
-    stage, trailSeconds, staleMs, oscPort,
+    stage, trailSeconds, staleMs, idleFadeSeconds, oscPort,
     names: { ...psnNames, ...names },
     inputs: inputsOn(),
     psn: { group, port },

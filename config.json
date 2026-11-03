@@ -48,5 +48,6 @@
   "names": { "sp": "SP Grid" },
 
   "trailSeconds": 3,
-  "staleMs": 1500
+  "staleMs": 1500,
+  "idleFadeSeconds": 30
 }
